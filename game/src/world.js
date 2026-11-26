@@ -72,7 +72,7 @@ export function stepWorld(s, input, dt) {
   if (!(input.pitch ?? 0)) s.pitch *= Math.max(0, 1 - dt * 0.8);
 
   // --- Motion ---
-  s.heading = wrapAngle(s.heading + s.roll * TURN_RATE * dt * (0.6 + s.speed / MAX_SPEED));
+  s.heading = wrapAngle(s.heading - s.roll * TURN_RATE * dt * (0.6 + s.speed / MAX_SPEED));
   const cp = Math.cos(s.pitch);
   const forward = new THREE.Vector3(
     Math.sin(s.heading) * cp,
