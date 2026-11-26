@@ -54,7 +54,7 @@ export function autopilotInput(s) {
   // Heading: bank toward the target, proportional to the error.
   const desiredHeading = Math.atan2(dx, dz);
   const err = wrapAngle(desiredHeading - s.heading);
-  const desiredRoll = THREE.MathUtils.clamp(err * 1.4, -0.85, 0.85);
+  const desiredRoll = THREE.MathUtils.clamp(-err * 1.4, -0.85, 0.85);
   input.roll = THREE.MathUtils.clamp((desiredRoll - s.roll) * 2.2, -1, 1);
 
   // Pitch: climb or descend toward the target height.
