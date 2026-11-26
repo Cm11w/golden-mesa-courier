@@ -16,13 +16,10 @@ Open `game/index.html` in desktop Chrome (no network needed — Three.js is
 vendored under `game/vendor/`).
 
 - **W / S** — throttle up / down
-- **← →** — roll: the plane banks and turns the same way (right arrow banks right and turns right, left arrow banks left and turns left)
-- **↑ ↓** — pitch up / down (climb and descend)
+- **← →** — roll (bank to turn)
+- **↑ ↓** — pitch
 - **Drag mouse** — look around
 - **G** — gear up / down · **R** — fly again after landing or a crash
-
-  Tip: ease off the throttle (**S**) before a tight turn — the plane turns
-  tighter at low speed — then throttle back up (**W**) on the straight.
 
 ## The sortie
 
@@ -40,14 +37,16 @@ the mail.
 
 ## What you see
 
-- A detailed propeller courier: tapered fuselage with orange cheatline and
-  "GOLDEN MESA / N427GM" livery, glass canopy, spinning propeller, cargo
-  pod, landing gear, red/green navigation lights.
-- A golden-hour canyon: layered mesas, a blue river, saguaro cacti,
-  cottonwoods, rocks, distant peaks, clouds and a low sun.
+- A detailed propeller courier: tapered fuselage with red cheatline and
+  "GOLDEN MESA / N427GM" livery, glass canopy, spinning propeller with
+  blur disc, cargo pod, landing gear, red/green navigation lights.
+- A golden-hour canyon: layered mesas, a wide turquoise river with sandy
+  banks, saguaro cacti, cottonwoods, rocks, distant peaks, clouds and a
+  low sun that rides ahead of the plane in every shot.
 - A home strip with painted markings, edge lights, a windsock and a tower.
 - A full panel: altitude, speed and heading, score, rings, time and cargo
-  up top; airspeed, attitude and altimeter dials, throttle and fuel below.
+  up top; airspeed, attitude and altimeter dials, throttle and fuel below,
+  all on one dashboard strip.
 - Synthesised engine hum, wind, ring chimes, warnings and a landing
   fanfare — no audio files.
 
