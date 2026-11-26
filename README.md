@@ -16,14 +16,19 @@ Open `game/index.html` in desktop Chrome (no network needed — Three.js is
 vendored under `game/vendor/`).
 
 - **W / S** — throttle up / down
-- **← →** — roll (bank to turn)
-- **↑ ↓** — pitch
+- **← →** — roll: the plane banks and turns the same way (right arrow banks right and turns right, left arrow banks left and turns left)
+- **↑ ↓** — pitch up / down (climb and descend)
 - **Drag mouse** — look around
 - **G** — gear up / down · **R** — fly again after landing or a crash
+
+  Tip: ease off the throttle (**S**) before a tight turn — the plane turns
+  tighter at low speed — then throttle back up (**W**) on the straight.
 
 ## The sortie
 
 | Leg | Name | Gates | What changes |
+
+
 |-----|------|-------|--------------|
 | 1 | Canyon Run | 4 | Calm air, learn the rings |
 | 2 | River Bend | 4 | Crosswind 8 kt pushes the plane |
