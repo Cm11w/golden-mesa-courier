@@ -1,15 +1,16 @@
 // Golden Mesa Courier — the screenshot staging.
-// One job: given ?shot=leg1|leg2|leg3|landing&seed=1, put the world into that
-// moment of a real sortie and let the autopilot fly it with fixed steps, so
-// every screenshot is a repeatable render of the real rules being played —
-// never a posed frame. Interactive play ignores this file entirely.
+// One job: given ?shot=title|leg2|leg3|landing&seed=1, put the world into
+// that moment of a real sortie and let the autopilot fly it with fixed
+// steps, so every screenshot is a repeatable render of the real rules being
+// played — never a posed frame. Interactive play ignores this file entirely.
 
 import * as THREE from 'three';
 import { LEGS, RING_SPOTS, WORLD } from './config.js';
 import { createWorld } from './world.js';
 import { autopilotInput } from './autopilot.js';
+import { groundHeightAt } from './terrain.js';
 
-export const SHOT_IDS = ['leg1', 'leg2', 'leg3', 'landing'];
+export const SHOT_IDS = ['title', 'leg2', 'leg3', 'landing'];
 
 /**
  * The score a real sortie would have at this moment, replayed from the award
@@ -32,7 +33,19 @@ function stagedScore(cleared, elapsed) {
 /** The four staged moments. Score rises across the shots, as a real run would. */
 export function stageShot(shotId) {
   const s = createWorld();
-  const leg = shotId === 'leg1' ? 0 : shotId === 'leg2' ? 1 : 2;
+  s.staged = true; // fixed personal best, no localStorage writes in shots
+  s.personalBest = shotId === 'landing' ? 10840 : 0;
+
+  if (shotId === 'title') {
+    // The title screen over the canyon at the start line: no flight yet.
+    s.phase = 'title';
+    s.titleTime = 1.2;
+    s.callout = '';
+    return s;
+  }
+
+  s.phase = 'fly';
+  const leg = shotId === 'leg2' ? 1 : 2;
   const cleared = shotId === 'landing' ? 12 : leg * 4 + 1;
   s.leg = shotId === 'landing' ? 2 : leg;
   s.ringsCleared = cleared;
@@ -40,7 +53,7 @@ export function stageShot(shotId) {
   s.crosswind = LEGS[s.leg].crosswind;
   // Leg 3 is staged late (elapsed 232 s) so the tank is genuinely low by the
   // drain rule below — the LOW FUEL banner in that shot is earned, not posed.
-  s.elapsed = [26, 96, 232, 262][shotId === 'leg1' ? 0 : shotId === 'leg2' ? 1 : shotId === 'leg3' ? 2 : 3];
+  s.elapsed = shotId === 'leg2' ? 96 : shotId === 'leg3' ? 232 : 262;
   s.score = stagedScore(cleared, s.elapsed);
   // Fuel from the real drain: 0.40 %/s at cruise throttle 0.7 (world.js drains
   // 0.12 + 0.40 * throttle), plus 2% topped up at each gate cleared.
@@ -61,6 +74,22 @@ export function stageShot(shotId) {
     s.heading = Math.PI;
     s.speed = 44;
     s.throttle = 0.42;
+  } else if (shotId === 'leg2') {
+    // The airmail shot: one ring into leg 2, between GATE 05 and GATE 06
+    // and lined up on it, with a parcel already dead-centre on RIVER POST
+    // (+500, DROPS 1/2 on the HUD) off to the right of the course.
+    s.drops[1].done = true;
+    s.drops[1].bonus = 500;
+    s.dropsDone = 1;
+    s.dropBonusTotal = 500;
+    s.score += 500;
+    s.packages.push({
+      x: 140, y: groundHeightAt(140, -1900) + 0.6, z: -1900, vy: 0, landed: true,
+    });
+    s.pos.set(20, 242, -1850);
+    s.heading = Math.atan2(-90 - 20, -2010 + 1850);
+    s.speed = 58;
+    s.throttle = 0.7;
   } else {
     s.pos.copy(back);
     s.heading = Math.atan2(next[0] - back.x, next[2] - back.z);
@@ -71,13 +100,9 @@ export function stageShot(shotId) {
   s.roll = 0;
 
   // Per-shot callout, as the real game would show it.
-  if (shotId === 'leg1') {
-    s.callout = 'GATE 02 — THREAD THE GOLDEN RING!';
+  if (shotId === 'leg2') {
+    s.callout = 'AIRMAIL +500 — DEAD CENTRE!';
     s.calloutUntil = s.elapsed + 30;
-  } else if (shotId === 'leg2') {
-    s.callout = 'CROSSWIND 8 KT · HOLD YOUR LINE';
-    s.calloutUntil = s.elapsed + 30;
-    s.calloutDanger = true;
   } else if (shotId === 'leg3') {
     s.callout = 'LOW FUEL — FLY HER HOME';
     s.calloutUntil = s.elapsed + 30;
@@ -94,6 +119,8 @@ export function stageShot(shotId) {
  * and sets window.__shotReady = true.
  */
 export function runStaging(s, stepWorld, steps = 150) {
+  // The title shot never flies: it is the title screen, frozen as loaded.
+  if (s.phase === 'title') return [];
   const events = [];
   for (let i = 0; i < steps; i += 1) {
     const input = autopilotInput(s);
@@ -113,14 +140,10 @@ export function runStaging(s, stepWorld, steps = 150) {
   // otherwise overwrite it with a generic gate banner.
   if (s.phase === 'fly') {
     const id = s.ringsCleared === 12 ? 'landing' : s.leg === 0 ? 'leg1' : s.leg === 1 ? 'leg2' : 'leg3';
-    if (id === 'leg1') {
-      s.callout = `GATE ${String(s.ringsCleared + 1).padStart(2, '0')} — THREAD THE GOLDEN RING!`;
+    if (id === 'leg2') {
+      s.callout = 'AIRMAIL +500 — DEAD CENTRE!';
       s.calloutUntil = s.elapsed + 30;
       s.calloutDanger = false;
-    } else if (id === 'leg2') {
-      s.callout = 'CROSSWIND 8 KT · HOLD YOUR LINE';
-      s.calloutUntil = s.elapsed + 30;
-      s.calloutDanger = true;
     } else if (id === 'leg3') {
       s.callout = 'LOW FUEL — FLY HER HOME';
       s.calloutUntil = s.elapsed + 30;

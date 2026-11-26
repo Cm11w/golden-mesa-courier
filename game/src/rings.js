@@ -61,7 +61,7 @@ export function buildRings() {
     // Rings stand upright across the course: face the incoming plane (south).
     ring.rotation.y = 0;
     group.add(ring);
-    rings.push({ group: ring, torus, halo, label, labelTex, centre: new THREE.Vector3(x, y, z), cleared: false, index: i });
+    rings.push({ group: ring, torus, halo, label, labelTex, centre: new THREE.Vector3(x, y, z), cleared: false, index: i, size: i < 2 ? 1.3 : 1 });
   }
 
   // Guide path: a dashed golden line from the plane to the next ring.
@@ -75,8 +75,8 @@ export function buildRings() {
 
   function update(planePos, nextRing, time) {
     for (const ring of rings) {
-      const pulse = 1 + 0.06 * Math.sin(time * 2.4 + ring.index);
-      ring.torus.scale.setScalar(ring.cleared ? 1 : pulse);
+      const pulse = (1 + 0.06 * Math.sin(time * 2.4 + ring.index)) * ring.size;
+      ring.torus.scale.setScalar(ring.cleared ? ring.size : pulse);
       ring.halo.material.opacity = ring.cleared ? 0.05 : 0.16 + 0.08 * Math.sin(time * 2.4 + ring.index);
       ring.torus.material = ring.cleared ? doneMat : goldMat;
     }

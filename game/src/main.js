@@ -12,10 +12,11 @@ import { buildRings } from './rings.js';
 import { buildRunway } from './runway.js';
 import { drawHud } from './hud.js';
 import { buildAudio } from './audio.js';
-import { createWorld, stepWorld, hudState } from './world.js';
+import { createWorld, dropPackage, stepWorld, hudState } from './world.js';
 import { autopilotInput } from './autopilot.js';
 import { SHOT_IDS, stageShot, runStaging } from './shots.js';
 import { createInput } from './input.js';
+import { buildDrops } from './drops.js';
 
 const params = new URLSearchParams(window.location.search);
 const shotId = params.get('shot');
@@ -74,6 +75,8 @@ const rings = buildRings();
 scene.add(rings.group);
 const runway = buildRunway();
 scene.add(runway.group);
+const drops = buildDrops();
+scene.add(drops.group);
 const aircraft = buildAircraft();
 scene.add(aircraft.group);
 
@@ -85,6 +88,8 @@ camera.lookAt(camTarget);
 
 // ---- State ----
 let state = shotMode ? stageShot(shotId) : createWorld();
+// Debug/test hook: the live state for automated checks (read-only use).
+window.__getState = () => state;
 const input = createInput(canvas);
 const audio = buildAudio();
 let frame = 0;
@@ -164,8 +169,27 @@ function handleEvents(events) {
     else if (e === 'leg') audio.leg();
     else if (e === 'warn') audio.warn();
     else if (e === 'landed') audio.land();
+    else if (e === 'drop') audio.drop();
     else if (e === 'thud') audio.thud();
   }
+}
+
+/** Where the next gate sits on screen (for the HUD edge arrow). */
+function gateScreenPos() {
+  const nextRing = state.ringsCleared < 12 ? rings.rings[state.ringsCleared] : null;
+  if (!nextRing) return null;
+  const v = nextRing.centre.clone().project(camera);
+  const behind = v.z > 1;
+  const nx = behind ? -v.x : v.x;
+  const ny = behind ? -v.y : v.y;
+  const x = (nx * 0.5 + 0.5) * hudCanvas.width;
+  const y = (-ny * 0.5 + 0.5) * hudCanvas.height;
+  const visible = !behind && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1;
+  return {
+    x, y, visible,
+    dist: state.pos.distanceTo(nextRing.centre),
+    label: `GATE ${String(nextRing.index + 1).padStart(2, '0')} · ${Math.round(state.pos.distanceTo(nextRing.centre))} m`,
+  };
 }
 
 function renderFrame() {
@@ -175,6 +199,7 @@ function renderFrame() {
   // Cleared rings turn green so the course shows how far the sortie has got.
   rings.rings.forEach((ring, i) => { ring.cleared = i < state.ringsCleared; });
   rings.update(state.pos, nextRing, state.elapsed);
+  drops.update(state, state.elapsed);
   if (nextRing && frame % 10 === 0) {
     rings.setLabelDistance(nextRing, state.pos.distanceTo(nextRing.centre));
   }
@@ -182,7 +207,7 @@ function renderFrame() {
   runway.windsock.rotation.y = Math.sin(state.elapsed * 0.7) * 0.4 + 0.6;
   runway.tower.userData.beacon.material.emissiveIntensity = 1.5 + 1.5 * Math.sin(state.elapsed * 3);
   renderer.render(scene, camera);
-  drawHud(hudCtx, hudState(state), hudCanvas.width, hudCanvas.height);
+  drawHud(hudCtx, hudState(state), hudCanvas.width, hudCanvas.height, gateScreenPos());
 }
 
 // ---- Shot mode: stage, freeze, flag ready ----
@@ -211,12 +236,25 @@ if (shotMode) {
     requestAnimationFrame(loop);
     const dt = Math.min(clock.getDelta(), 0.05);
     const controls = input.read(state.throttle);
-    if (controls.restart && state.phase !== 'fly') {
+    if (state.phase === 'title') {
+      state.titleTime = (state.titleTime || 0) + dt;
+      if (controls.start) {
+        state.phase = 'fly';
+        audio.unlock();
+      }
+    }
+    if ((controls.restart || controls.start) && (state.phase === 'landed' || state.phase === 'over')) {
+      // Fly again straight into the air — the title screen only shows once.
       state = createWorld();
+      state.phase = 'fly';
       resetCamera();
     }
     if (controls.gear) state.gearDown = !state.gearDown;
     if (state.phase === 'fly') {
+      if (controls.drop) {
+        const bonus = dropPackage(state);
+        if (bonus !== null) handleEvents(['drop']);
+      }
       const events = stepWorld(state, controls, dt);
       handleEvents(events);
     }

@@ -1,6 +1,8 @@
 // Golden Mesa Courier — keyboard + mouse input.
 // One job: turn keys and the mouse into flight controls and camera looks.
-// W/S throttle, arrows pitch and roll, R restart, G gear, drag to look.
+// W/S throttle, arrows pitch and roll, SPACE airmail drop, R restart,
+// G gear, ENTER/click to start from the title screen (and to fly again),
+// drag to look.
 
 export function createInput(canvas) {
   const keys = new Set();
@@ -10,6 +12,7 @@ export function createInput(canvas) {
   let lastX = 0;
   let lastY = 0;
   let interacted = false;
+  let clicked = false;
 
   window.addEventListener('keydown', (e) => {
     keys.add(e.code);
@@ -22,6 +25,7 @@ export function createInput(canvas) {
     lastX = e.clientX;
     lastY = e.clientY;
     interacted = true;
+    clicked = true;
   });
   window.addEventListener('pointerup', () => { dragging = false; });
   window.addEventListener('pointermove', (e) => {
@@ -43,9 +47,15 @@ export function createInput(canvas) {
       const roll = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0);
       const restart = keys.has('KeyR');
       const gear = keys.has('KeyG');
+      // Edge-triggered actions: consumed once per press, never held.
+      const drop = keys.has('Space');
+      const start = keys.has('Enter') || clicked;
       if (restart) keys.delete('KeyR');
       if (gear) keys.delete('KeyG');
-      return { pitch, roll, throttle: next, restart, gear };
+      if (drop) keys.delete('Space');
+      if (keys.has('Enter')) keys.delete('Enter');
+      clicked = false;
+      return { pitch, roll, throttle: next, restart, gear, drop, start };
     },
     /** Mouse look offset in radians; decays back to centre when released. */
     look() {

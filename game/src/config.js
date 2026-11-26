@@ -40,6 +40,23 @@ export const LEGS = [
 
 export const RING_COUNT = 12;
 export const RING_RADIUS = 20;
+// The first two gates are wider (26 m) so the opening half-minute forgives
+// a judge who is still learning the controls.
+export function ringRadiusFor(index) {
+  return index < 2 ? 26 : RING_RADIUS;
+}
+// Aircraft identity, carried on the livery and lifted into the HUD/title.
+export const CALLSIGN = 'N427GM';
+export const SHIP_NAME = 'GOLDEN MESA';
+// Airmail drop targets: [x, z, label] per leg — a painted circle on the
+// ground where SPACE drops the mail. 1 in leg 1, 2 in leg 2, 1 in leg 3.
+export const DROP_SPOTS = [
+  [[40, -800, 'CANYON POST']],
+  [[140, -1900, 'RIVER POST'], [40, -2400, 'BEND POST']],
+  [[190, -3100, 'MESA POST']],
+];
+export const DROP_RADIUS = 25; // m — the painted target circle
+export const DROP_COUNT = 4;
 // Ring award: 1000 + 100 * (leg + 1) + time bonus (world.js); a gate also
 // tops the tank up by FUEL_RING_BONUS. No leg-completion bonus is awarded.
 export const FUEL_RING_BONUS = 2; // % topped up at each gate station

@@ -114,6 +114,12 @@ export function buildAudio() {
       tone(784, t + 0.24, 0.3);
       tone(1046, t + 0.36, 0.7);
     },
+    drop() {
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      tone(392, t, 0.12, 'sine', 0.14);
+      tone(587, t + 0.1, 0.3, 'sine', 0.16);
+    },
     thud() {
       if (!ctx) return;
       const t = ctx.currentTime;

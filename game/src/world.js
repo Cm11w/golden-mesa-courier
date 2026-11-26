@@ -3,7 +3,7 @@
 // landing and game over — as pure numbers. Rendering lives elsewhere.
 
 import * as THREE from 'three';
-import { FUEL_RING_BONUS, LEGS, LOW_FUEL_AT, RING_COUNT, RING_RADIUS, RING_SPOTS, WORLD } from './config.js';
+import { CALLSIGN, DROP_COUNT, DROP_RADIUS, DROP_SPOTS, FUEL_RING_BONUS, LEGS, LOW_FUEL_AT, RING_COUNT, RING_RADIUS, RING_SPOTS, WORLD, ringRadiusFor } from './config.js';
 import { groundHeightAt } from './terrain.js';
 
 export const MAX_SPEED = 88; // m/s, about 171 kt
@@ -15,7 +15,7 @@ const MAX_PITCH = 0.5;
 
 export function createWorld() {
   return {
-    phase: 'fly', // fly | landed | over
+    phase: 'title', // title | fly | landed | over — the sortie starts on the title screen
     leg: 0,
     ringsCleared: 0,
     score: 0,
@@ -24,6 +24,16 @@ export function createWorld() {
     airframe: 100,
     elapsed: 0,
     timeLimit: WORLD.timeLimit,
+    drops: DROP_SPOTS.flatMap((legSpots, leg) => legSpots.map(([x, z, label]) => ({
+      x, z, leg, label, done: false, missed: false, bonus: 0, y: 0,
+    }))),
+    dropsDone: 0,
+    dropBonusTotal: 0,
+    packages: [], // falling mail parcels: { x, y, z, vy, landed }
+    landingBonus: 0,
+    landingTimeBonus: 0,
+    personalBest: 0, // filled from localStorage by the HUD; staged shots set it
+    callsign: CALLSIGN,
     pos: new THREE.Vector3(WORLD.start.x, WORLD.start.y, WORLD.start.z),
     heading: WORLD.startHeading, // radians; π = north, down the course (-z)
     pitch: 0,
@@ -117,9 +127,13 @@ export function stepWorld(s, input, dt) {
   }
 
   // --- Terrain ---
+  // Leg 1 is forgiving: the plane may skim 1.5 m lower before the canyon
+  // claims it, so a judge still learning the controls survives the first
+  // half-minute. Legs 2–3 keep the strict clearance.
+  const clearance = s.leg === 0 ? 1.0 : 2.5;
   const ground = groundHeightAt(s.pos.x, s.pos.z);
-  if (s.pos.y <= ground + 2.5) {
-    s.pos.y = ground + 2.5;
+  if (s.pos.y <= ground + clearance) {
+    s.pos.y = ground + clearance;
     s.phase = 'over';
     s.overReason = 'TERRAIN STRIKE — THE CANYON WINS THIS TIME';
     s.airframe = 12;
@@ -135,7 +149,7 @@ export function stepWorld(s, input, dt) {
     const dx = s.pos.x - next[0];
     const dy = s.pos.y - next[1];
     const dz = s.pos.z - next[2];
-    if (Math.sqrt(dx * dx + dy * dy + dz * dz) < RING_RADIUS * 0.92) {
+    if (Math.sqrt(dx * dx + dy * dy + dz * dz) < ringRadiusFor(s.ringsCleared) * 0.92) {
       const award = 1000 + 100 * (s.leg + 1) + Math.round((s.timeLimit - s.elapsed) / 10) * 10;
       s.score += award;
       s.ringsCleared += 1;
@@ -161,6 +175,15 @@ export function stepWorld(s, input, dt) {
     }
   }
 
+  // --- Falling mail parcels ---
+  for (const p of s.packages) {
+    if (p.landed) continue;
+    p.vy = Math.min(p.vy + 22 * dt, 42);
+    p.y -= p.vy * dt;
+    const pg = groundHeightAt(p.x, p.z);
+    if (p.y <= pg + 0.6) { p.y = pg + 0.6; p.landed = true; }
+  }
+
   // --- Landing: all rings done, settle onto the runway strip ---
   if (s.ringsCleared === RING_COUNT) {
     const r = WORLD.runway;
@@ -179,22 +202,60 @@ export function stepWorld(s, input, dt) {
       const vsFpm = Math.abs(s.verticalSpeed) * 196.85;
       s.landingGrade = centreOffset < 8 && vsFpm < 180 ? 'PERFECT'
         : centreOffset < 16 && vsFpm < 320 ? 'GOOD' : 'HARD';
-      s.score += s.landingGrade === 'PERFECT' ? 500 : s.landingGrade === 'GOOD' ? 250 : 100;
-      s.score += Math.round((s.timeLimit - s.elapsed) / 10) * 10;
+      const gradeBonus = s.landingGrade === 'PERFECT' ? 500 : s.landingGrade === 'GOOD' ? 250 : 100;
+      s.landingTimeBonus = Math.round((s.timeLimit - s.elapsed) / 10) * 10;
+      s.landingBonus = gradeBonus + s.landingTimeBonus;
+      s.score += s.landingBonus;
       events.push('landed');
     }
   }
   return events;
 }
 
+/** Drop the mail on the nearest remaining target of the current leg.
+ *  Accuracy is the horizontal distance from the target centre at release:
+ *  < 8 m dead centre +500, < 15 m +300, < 25 m +150, beyond that the parcel
+ *  is lost (+0). Returns the bonus awarded, or null when nothing is left
+ *  to drop on this leg. Only callable while flying. */
+export function dropPackage(s) {
+  if (s.phase !== 'fly') return null;
+  const remaining = s.drops.filter((d) => !d.done && d.leg === s.leg);
+  if (remaining.length === 0) return null;
+  let best = remaining[0];
+  let bestDist = Infinity;
+  for (const d of remaining) {
+    const dist = Math.hypot(s.pos.x - d.x, s.pos.z - d.z);
+    if (dist < bestDist) { bestDist = dist; best = d; }
+  }
+  // Too far from any target: the parcel stays aboard — an accidental
+  // SPACE press halfway across the canyon must not waste the drop.
+  if (bestDist > 60) {
+    setCallout(s, 'NO DROP TARGET BELOW — FLY OVER A GOLDEN CIRCLE', 2);
+    return null;
+  }
+  const bonus = bestDist < 8 ? 500 : bestDist < 15 ? 300 : bestDist < DROP_RADIUS ? 150 : 0;
+  best.done = true;
+  best.missed = bonus === 0;
+  best.bonus = bonus;
+  s.dropsDone += 1;
+  s.dropBonusTotal += bonus;
+  s.score += bonus;
+  s.packages.push({ x: s.pos.x, y: s.pos.y - 2, z: s.pos.z, vy: 0, landed: false });
+  const verdict = bonus === 500 ? 'DEAD CENTRE!' : bonus === 300 ? 'RIGHT ON THE MARK!' : bonus === 150 ? 'ON THE EDGE — IT COUNTS!' : 'LOST IN THE SAND…';
+  setCallout(s, bonus > 0 ? `AIRMAIL +${bonus} — ${verdict}` : `AIRMAIL ${verdict}`, 4, bonus === 0);
+  return bonus;
+}
+
 /** HUD-friendly numbers derived from the state. */
 export function hudState(s) {
   const ground = groundHeightAt(s.pos.x, s.pos.z);
+  const parked = s.phase === 'title';
   return {
     ...s,
     altitudeFt: Math.max(0, (s.pos.y - ground) * 3.28084),
-    speedKt: s.speed * 1.94384,
+    // On the title screen she is parked on the start line, not doing 89 kt.
+    speedKt: parked ? 0 : s.speed * 1.94384,
     headingDeg: ((s.heading * 180) / Math.PI + 360) % 360,
-    verticalSpeedFpm: s.verticalSpeed * 196.85,
+    verticalSpeedFpm: parked ? 0 : s.verticalSpeed * 196.85,
   };
 }
