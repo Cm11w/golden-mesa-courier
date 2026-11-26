@@ -27,8 +27,6 @@ vendored under `game/vendor/`).
 ## The sortie
 
 | Leg | Name | Gates | What changes |
-
-
 |-----|------|-------|--------------|
 | 1 | Canyon Run | 4 | Calm air, learn the rings |
 | 2 | River Bend | 4 | Crosswind 8 kt pushes the plane |
