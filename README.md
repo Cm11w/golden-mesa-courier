@@ -4,8 +4,9 @@
 [![make.fun](https://make.fun/badge/best-flight-game-20261126-0057/Cm11w/golden-mesa-courier/rank.svg)](https://make.fun/c/best-flight-game-20261126-0057)
 [![make.fun](https://make.fun/badge/best-flight-game-20261126-0057/Cm11w/golden-mesa-courier/reward.svg)](https://make.fun/c/best-flight-game-20261126-0057)
 
-A golden-hour mail run through a desert canyon. Fly a propeller courier
-through twelve glowing gates across three named legs, fight the crosswind,
+A golden-hour mail run through a desert canyon. Fly propeller courier
+**N427GM — GOLDEN MESA** through twelve glowing gates across three named
+legs, drop the mail on the painted ground targets, fight the crosswind,
 watch the fuel, and land her gently on the home strip for a grade.
 
 **Bounty:** [Make the best flight game — make.fun](https://make.fun/c/best-flight-game-20261126-0057)
@@ -13,13 +14,21 @@ watch the fuel, and land her gently on the home strip for a grade.
 ## How to fly
 
 Open `game/index.html` in desktop Chrome (no network needed — Three.js is
-vendored under `game/vendor/`).
+vendored under `game/vendor/`). The title screen comes up first — press
+**ENTER** (or click) to fly.
 
 - **W / S** — throttle up / down
 - **← →** — roll (bank to turn)
 - **↑ ↓** — pitch
+- **SPACE** — airmail drop: release the mail over a painted ground target
 - **Drag mouse** — look around
 - **G** — gear up / down · **R** — fly again after landing or a crash
+- **ENTER / click** — fly again from the results screen
+
+The first ten seconds show the controls on screen; the first two gates
+are wider and leg 1 forgives a low skim, so the opening half-minute
+teaches instead of punishing. An arrow at the screen edge points at the
+next gate whenever it is out of view.
 
 ## The sortie
 
@@ -30,10 +39,15 @@ vendored under `game/vendor/`).
 | 3 | Mesa Gates | 4 | Crosswind 16 kt, fuel running low |
 
 Thread a ring to score and top up fuel (+2%) and time (+8 s). Cargo grows
-with every leg — 24 kg, then 60 kg, then 144 kg. Clear all twelve gates and
-land on the runway: **PERFECT**, **GOOD** or **HARD**, by how gently and how
-centred you touch down. Hit the terrain or run dry and the canyon keeps
-the mail.
+with every leg — 24 kg, then 60 kg, then 144 kg. **Airmail drops:** each
+leg has painted drop targets on the ground (Canyon Post, River Post, Bend
+Post, Mesa Post) — press SPACE over one to release a parcel. Dead centre
+(< 8 m) pays **+500**, on the mark (< 15 m) **+300**, on the edge (< 25 m)
+**+150**; a parcel lost in the sand pays nothing. Clear all twelve gates
+and land on the runway: **PERFECT**, **GOOD** or **HARD**, by how gently
+and how centred you touch down — plus a landing bonus and your personal
+best on the results screen. Hit the terrain or run dry and the canyon
+keeps the mail.
 
 ## What you see
 
@@ -44,21 +58,23 @@ the mail.
   banks, saguaro cacti, cottonwoods, rocks, distant peaks, clouds and a
   low sun that rides ahead of the plane in every shot.
 - A home strip with painted markings, edge lights, a windsock and a tower.
-- A full panel: altitude, speed and heading, score, rings, time and cargo
-  up top; airspeed, attitude and altimeter dials, throttle and fuel below,
-  all on one dashboard strip.
+- A full panel: altitude, speed and heading, score, rings, airmail drops,
+  time and cargo up top; airspeed, attitude and altimeter dials, throttle
+  and fuel below, all on one dashboard strip. The leg panel carries the
+  ship's callsign — `LEG 2 / 3 · N427GM`.
 - Synthesised engine hum, wind, ring chimes, warnings and a landing
   fanfare — no audio files.
 
 ## Screenshots
 
 Four staged shots, each a repeatable render of the real rules being
-played with a fixed seed (`game/index.html?shot=leg1|leg2|leg3|landing&seed=1`):
+played with a fixed seed (`game/index.html?shot=title|leg2|leg3|landing&seed=1`):
 
-1. Leg 1 mid-flight, threading Gate 02 in the canyon
-2. Leg 2 along the river, crosswind warning up
+1. Title screen — GOLDEN MESA · N427GM, premise and controls, ENTER to fly
+2. Leg 2 along the river, airmail parcel dead centre on River Post (+500)
 3. Leg 3 through the mesa gates, fuel low
-4. Landing on the runway with the results screen — 12/12 gates
+4. Landing on the runway with the results screen — big final score, gates /
+   time left / landing grade, landing bonus, personal best, 12/12 gates
 
 ## Build
 
@@ -83,6 +99,7 @@ game/src/hud.js          top bar, dials, callouts, end screens
 game/src/audio.js        synthesised engine, chimes, warnings
 game/src/world.js        flight model + rules (rings, fuel, landing)
 game/src/autopilot.js    steady pilot used only for screenshots
+game/src/drops.js        airmail targets + falling parcels
 game/src/shots.js        ?shot= staging, fixed seed
 game/src/input.js        keyboard + mouse
 game/src/main.js         bootstrap + render loop
