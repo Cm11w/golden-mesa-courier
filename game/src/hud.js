@@ -3,7 +3,7 @@
 // compass, bottom dials, fuel, throttle, and the big in-scene callouts.
 // The dials are drawn with ticks, numbers and needles — never blank squares.
 
-import { DROP_COUNT, FUEL_RING_BONUS, LEGS, LOW_FUEL_AT, RING_COUNT } from './config.js';
+import { FUEL_RING_BONUS, LEGS, LOW_FUEL_AT, RING_COUNT } from './config.js';
 
 const CREAM = '#f5e9c8';
 const GOLD = '#ffc23d';
@@ -72,29 +72,8 @@ function needle(ctx, cx, cy, r, angle, color = GOLD, width = 3) {
   ctx.fill();
 }
 
-/** Personal best: staged shots carry a fixed one; interactive play reads
- *  and writes localStorage (guarded — some embeds block it). */
-function personalBest(s) {
-  if (s.personalBest > 0) return s.personalBest;
-  try {
-    return Number(window.localStorage.getItem('golden-mesa-best') || 0) || 0;
-  } catch (err) {
-    return 0;
-  }
-}
-
-function savePersonalBest(s) {
-  if (s.staged) return;
-  try {
-    const prev = Number(window.localStorage.getItem('golden-mesa-best') || 0) || 0;
-    if (s.score > prev) window.localStorage.setItem('golden-mesa-best', String(s.score));
-  } catch (err) { /* storage unavailable — the best still shows this run */ }
-}
-
-/** Draw the HUD for one frame. `s` is the world state, `w`/`h` the canvas
- *  size. `gateScreen` (optional) is the next gate's projected screen
- *  position { x, y, visible, dist, label } for the off-screen edge arrow. */
-export function drawHud(ctx, s, w, h, gateScreen) {
+/** Draw the HUD for one frame. `s` is the world state, `w`/`h` the canvas size. */
+export function drawHud(ctx, s, w, h) {
   ctx.clearRect(0, 0, w, h);
   const leg = LEGS[s.leg];
   const timeLeft = Math.max(0, s.timeLimit - s.elapsed);
@@ -109,18 +88,17 @@ export function drawHud(ctx, s, w, h, gateScreen) {
   ctx.fillText('GOLDEN MESA', 28, 36);
   ctx.font = '11px Georgia, serif';
   ctx.fillStyle = 'rgba(245, 233, 200, 0.75)';
-  ctx.fillText('N427GM · COURIER', 28, 54);
+  ctx.fillText('C O U R I E R', 28, 54);
   const stats = [
     ['ALT', `${Math.round(s.altitudeFt)}`, 'FT'],
     ['SPD', `${Math.round(s.speedKt)}`, 'KT'],
     ['HDG', `${String(Math.round(s.headingDeg)).padStart(3, '0')}°`, ''],
     ['SCORE', String(s.score).padStart(6, '0'), ''],
     ['RINGS', `${s.ringsCleared} / ${RING_COUNT}`, ''],
-    ['DROPS', `${s.dropsDone} / ${DROP_COUNT}`, ''],
     ['TIME', `${mm}:${ss}`, ''],
     ['CARGO', `${s.cargoKg} KG`, ''],
   ];
-  let sx = 300;
+  let sx = 330;
   for (const [label, value, unit] of stats) {
     ctx.textAlign = 'left';
     ctx.font = '10px Georgia, serif';
@@ -134,7 +112,7 @@ export function drawHud(ctx, s, w, h, gateScreen) {
       ctx.fillStyle = 'rgba(245, 233, 200, 0.7)';
       ctx.fillText(unit, sx + ctx.measureText(value).width + 6, 54);
     }
-    sx += 118;
+    sx += 132;
   }
 
   // ---- Leg panel (left, under the bar) ----
@@ -142,7 +120,7 @@ export function drawHud(ctx, s, w, h, gateScreen) {
   ctx.textAlign = 'left';
   ctx.font = '11px Georgia, serif';
   ctx.fillStyle = 'rgba(245, 233, 200, 0.75)';
-  ctx.fillText(`${leg.tag} · N427GM`, 26, 100);
+  ctx.fillText(leg.tag, 26, 100);
   ctx.font = 'bold 20px Georgia, serif';
   ctx.fillStyle = GOLD;
   ctx.fillText(leg.name, 26, 126);
@@ -195,12 +173,13 @@ export function drawHud(ctx, s, w, h, gateScreen) {
   ctx.fillStyle = 'rgba(245, 233, 200, 0.7)';
   ctx.fillText(s.phase === 'landed' ? 'ON THE GROUND' : `GEAR ${s.gearDown ? 'DOWN' : 'UP'}`, w - 216, 146);
 
-  // ---- Bottom instrument cluster ----
+  // ---- Left instrument column (dials) + bottom corners (throttle/fuel) ----
+  // Floating panels only — NO full-width strip. The r2 strip ran to the
+  // bottom edge and hid the aircraft's tail and the scene below it.
+  // Each instrument keeps its own small panel; the gaps show the plane.
+  // The 3 round dials sit in a left column (CEO 26 Nov ~21:59 WIB), stacked
+  // between the leg panel and the throttle panel, at the 3 marked spots.
   const by = h - 128;
-  // One continuous dashboard strip behind the whole cluster, so the
-  // instruments read as a cockpit panel instead of floating boxes.
-  // It runs to the bottom edge so the dial labels sit on the panel too.
-  panel(ctx, 12, by - 14, w - 24, 140, 12);
   // Throttle bar (left).
   panel(ctx, 12, by - 8, 150, 104, 10);
   ctx.textAlign = 'left';
@@ -217,22 +196,22 @@ export function drawHud(ctx, s, w, h, gateScreen) {
   ctx.fillStyle = 'rgba(245, 233, 200, 0.7)';
   ctx.fillText('W / S', 26, by + 82);
 
-  // Airspeed dial.
-  dial(ctx, 260, by + 42, 46, 'AIRSPEED', 'KNOTS');
+  // Airspeed dial — left column, top.
+  dial(ctx, 108, 226, 38, 'AIRSPEED', 'KNOTS');
   const spdAngle = -Math.PI * 0.75 + (Math.min(180, s.speedKt) / 180) * Math.PI * 1.5;
-  needle(ctx, 260, by + 42, 46, spdAngle);
+  needle(ctx, 108, 226, 38, spdAngle);
   ctx.fillStyle = CREAM;
   ctx.font = 'bold 20px Georgia, serif';
   ctx.textAlign = 'center';
-  ctx.fillText(String(Math.round(s.speedKt)), 260, by + 58);
+  ctx.fillText(String(Math.round(s.speedKt)), 108, 242);
 
-  // Attitude / horizon.
-  dial(ctx, 400, by + 42, 46, 'ATTITUDE', `V/S ${s.verticalSpeedFpm >= 0 ? '+' : ''}${Math.round(s.verticalSpeedFpm)} FT/MIN`);
+  // Attitude / horizon — left column, middle.
+  dial(ctx, 108, 356, 38, 'ATTITUDE', `V/S ${s.verticalSpeedFpm >= 0 ? '+' : ''}${Math.round(s.verticalSpeedFpm)} FT/MIN`);
   ctx.save();
   ctx.beginPath();
-  ctx.arc(400, by + 42, 46, 0, Math.PI * 2);
+  ctx.arc(108, 356, 38, 0, Math.PI * 2);
   ctx.clip();
-  ctx.translate(400, by + 42);
+  ctx.translate(108, 356);
   ctx.rotate(-s.roll);
   ctx.translate(0, s.pitch * 120);
   ctx.fillStyle = '#7fb6d9';
@@ -245,23 +224,23 @@ export function drawHud(ctx, s, w, h, gateScreen) {
   ctx.strokeStyle = GOLD;
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(400 - 18, by + 42);
-  ctx.lineTo(400 + 18, by + 42);
+  ctx.moveTo(108 - 18, 356);
+  ctx.lineTo(108 + 18, 356);
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(400, by + 42, 46, 0, Math.PI * 2);
+  ctx.arc(108, 356, 38, 0, Math.PI * 2);
   ctx.strokeStyle = CREAM;
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  // Altimeter dial.
-  dial(ctx, 540, by + 42, 46, 'ALTIMETER', 'FEET');
+  // Altimeter dial — left column, bottom.
+  dial(ctx, 108, 486, 38, 'ALTIMETER', 'FEET');
   const altAngle = -Math.PI * 0.75 + ((s.altitudeFt % 1000) / 1000) * Math.PI * 1.5;
-  needle(ctx, 540, by + 42, 46, altAngle);
+  needle(ctx, 108, 486, 38, altAngle);
   ctx.fillStyle = CREAM;
   ctx.font = 'bold 18px Georgia, serif';
   ctx.textAlign = 'center';
-  ctx.fillText(String(Math.round(s.altitudeFt)), 540, by + 58);
+  ctx.fillText(String(Math.round(s.altitudeFt)), 108, 502);
 
   // Fuel gauge (right).
   panel(ctx, w - 230, by - 8, 218, 104, 10);
@@ -294,133 +273,38 @@ export function drawHud(ctx, s, w, h, gateScreen) {
     ctx.restore();
   }
 
-  // ---- Hint line (first 10 seconds of flight, then it gets out of the way) ----
-  if (s.phase === 'fly' && s.elapsed < 10) {
+  // ---- Hint line (early flight only, above the instrument cluster) ----
+  if (s.phase === 'fly' && s.elapsed < 7) {
     ctx.fillStyle = 'rgba(245, 233, 200, 0.85)';
     ctx.font = '14px Georgia, serif';
     ctx.textAlign = 'center';
-    ctx.fillText('W / S — THROTTLE · ← / → — BANK · ↑ / ↓ — PITCH · SPACE — AIRMAIL DROP', w / 2, h - 148);
-  }
-
-  // ---- Off-screen gate arrow: when the next gate is out of frame, point at it ----
-  if (s.phase === 'fly' && gateScreen && !gateScreen.visible && s.ringsCleared < RING_COUNT) {
-    const cx = w / 2;
-    const cy = h / 2;
-    const ang = Math.atan2(gateScreen.y - cy, gateScreen.x - cx);
-    const ex = cx + Math.cos(ang) * (w / 2 - 70);
-    const ey = cy + Math.sin(ang) * (h / 2 - 170);
-    ctx.save();
-    ctx.translate(ex, ey);
-    ctx.rotate(ang);
-    ctx.fillStyle = GOLD;
-    ctx.beginPath();
-    ctx.moveTo(18, 0);
-    ctx.lineTo(-12, -13);
-    ctx.lineTo(-12, 13);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-    ctx.fillStyle = GOLD;
-    ctx.font = 'bold 16px Georgia, serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(gateScreen.label, ex, ey + 34);
-  }
-
-  // ---- Title screen ----
-  if (s.phase === 'title') {
-    ctx.fillStyle = 'rgba(8, 26, 32, 0.55)';
-    ctx.fillRect(0, 0, w, h);
-    ctx.textAlign = 'center';
-    ctx.fillStyle = GOLD;
-    ctx.font = 'bold 64px Georgia, serif';
-    ctx.fillText('GOLDEN MESA', w / 2, h / 2 - 150);
-    ctx.fillStyle = CREAM;
-    ctx.font = 'bold 26px Georgia, serif';
-    ctx.fillText('C O U R I E R   ·   N 4 2 7 G M', w / 2, h / 2 - 108);
-    ctx.font = '20px Georgia, serif';
-    ctx.fillText('A golden-hour mail run through the canyon — 12 gates, 3 legs, land her gently.', w / 2, h / 2 - 62);
-    ctx.font = '18px Georgia, serif';
-    ctx.fillStyle = 'rgba(245, 233, 200, 0.9)';
-    const controls = [
-      'W / S — THROTTLE      ← / → — ROLL      ↑ / ↓ — PITCH',
-      'G — GEAR      SPACE — AIRMAIL DROP      R — RETRY',
-    ];
-    controls.forEach((line, i) => ctx.fillText(line, w / 2, h / 2 - 8 + i * 30));
-    ctx.fillStyle = GOLD;
-    ctx.font = 'bold 26px Georgia, serif';
-    const blink = 0.65 + 0.35 * Math.sin((s.titleTime || 0) * 3);
-    ctx.save();
-    ctx.globalAlpha = blink;
-    ctx.fillText('PRESS ENTER TO FLY', w / 2, h / 2 + 78);
-    ctx.restore();
-    ctx.fillStyle = 'rgba(245, 233, 200, 0.75)';
-    ctx.font = '15px Georgia, serif';
-    ctx.fillText('or click anywhere to fly', w / 2, h / 2 + 108);
+    ctx.fillText('W / S throttle · ← → roll · ↑ ↓ pitch · drag mouse to look', w / 2, h - 148);
   }
 
   // ---- End screens ----
   if (s.phase === 'landed' || s.phase === 'over') {
-    const best = Math.max(personalBest(s), s.score);
-    savePersonalBest(s);
     ctx.fillStyle = 'rgba(8, 26, 32, 0.62)';
     ctx.fillRect(0, 0, w, h);
+    const title = s.phase === 'landed' ? 'A GOLDEN TOUCHDOWN' : 'SORTIE OVER';
+    const lines = s.phase === 'landed'
+      ? [
+          `LANDING GRADE  ${s.landingGrade}`,
+          `GATES  ${s.ringsCleared} / ${RING_COUNT}`,
+          `CARGO DELIVERED  ${s.cargoKg} KG`,
+          `SCORE  ${String(s.score).padStart(6, '0')}`,
+        ]
+      : [
+          `GATES  ${s.ringsCleared} / ${RING_COUNT}`,
+          `SCORE  ${String(s.score).padStart(6, '0')}`,
+          s.overReason,
+          'PRESS R TO FLY AGAIN',
+        ];
     ctx.textAlign = 'center';
-    if (s.phase === 'landed') {
-      ctx.fillStyle = GOLD;
-      ctx.font = 'bold 44px Georgia, serif';
-      ctx.fillText('A GOLDEN TOUCHDOWN', w / 2, h / 2 - 148);
-      ctx.fillStyle = CREAM;
-      ctx.font = '20px Georgia, serif';
-      ctx.fillText(`LANDING ${s.landingGrade} · CARGO DELIVERED ${s.cargoKg} KG`, w / 2, h / 2 - 112);
-      // The final score, big in the middle.
-      ctx.fillStyle = GOLD;
-      ctx.font = 'bold 84px Georgia, serif';
-      ctx.fillText(String(s.score).padStart(6, '0'), w / 2, h / 2 - 18);
-      ctx.fillStyle = 'rgba(245, 233, 200, 0.75)';
-      ctx.font = '15px Georgia, serif';
-      ctx.fillText('F I N A L   S C O R E', w / 2, h / 2 + 8);
-      // Breakdown: three columns.
-      const cols = [
-        ['GATES', `${s.ringsCleared} / ${RING_COUNT}`],
-        ['TIME LEFT', `${mm}:${ss}`],
-        ['LANDING', s.landingGrade],
-      ];
-      cols.forEach(([label, value], i) => {
-        const cx = w / 2 + (i - 1) * 220;
-        ctx.fillStyle = 'rgba(245, 233, 200, 0.7)';
-        ctx.font = '13px Georgia, serif';
-        ctx.fillText(label, cx, h / 2 + 52);
-        ctx.fillStyle = CREAM;
-        ctx.font = 'bold 28px Georgia, serif';
-        ctx.fillText(value, cx, h / 2 + 88);
-      });
-      ctx.fillStyle = GOLD;
-      ctx.font = 'bold 22px Georgia, serif';
-      ctx.fillText(`LANDING BONUS  +${s.landingBonus}`, w / 2, h / 2 + 128);
-      ctx.fillStyle = CREAM;
-      ctx.font = '20px Georgia, serif';
-      ctx.fillText(`PERSONAL BEST  ${String(best).padStart(6, '0')}`, w / 2, h / 2 + 160);
-    } else {
-      ctx.fillStyle = GOLD;
-      ctx.font = 'bold 44px Georgia, serif';
-      ctx.fillText('THE CANYON KEEPS THE MAIL', w / 2, h / 2 - 148);
-      ctx.fillStyle = CREAM;
-      ctx.font = '20px Georgia, serif';
-      ctx.fillText(s.overReason, w / 2, h / 2 - 112);
-      ctx.fillStyle = GOLD;
-      ctx.font = 'bold 84px Georgia, serif';
-      ctx.fillText(String(s.score).padStart(6, '0'), w / 2, h / 2 - 18);
-      ctx.fillStyle = 'rgba(245, 233, 200, 0.75)';
-      ctx.font = '15px Georgia, serif';
-      ctx.fillText('S C O R E', w / 2, h / 2 + 8);
-      ctx.fillStyle = CREAM;
-      ctx.font = 'bold 28px Georgia, serif';
-      ctx.fillText(`GATES  ${s.ringsCleared} / ${RING_COUNT}`, w / 2, h / 2 + 56);
-      ctx.font = '20px Georgia, serif';
-      ctx.fillText(`PERSONAL BEST  ${String(best).padStart(6, '0')}`, w / 2, h / 2 + 96);
-    }
     ctx.fillStyle = GOLD;
-    ctx.font = 'bold 22px Georgia, serif';
-    ctx.fillText('ENTER / CLICK · FLY AGAIN', w / 2, h / 2 + 196);
+    ctx.font = 'bold 44px Georgia, serif';
+    ctx.fillText(title, w / 2, h / 2 - 84);
+    ctx.fillStyle = CREAM;
+    ctx.font = '24px Georgia, serif';
+    lines.forEach((line, i) => ctx.fillText(line, w / 2, h / 2 - 28 + i * 38));
   }
 }
