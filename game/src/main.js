@@ -95,7 +95,7 @@ function placeAircraft() {
   g.rotation.order = 'YXZ';
   g.rotation.y = state.heading;
   g.rotation.x = -state.pitch;
-  g.rotation.z = -state.roll;
+  g.rotation.z = state.roll;
   // The gear shows only when it is down (the HUD says GEAR UP in flight).
   aircraft.gear.visible = state.gearDown;
   aircraft.propeller.rotation.z += 0.5;
