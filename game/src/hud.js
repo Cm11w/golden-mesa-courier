@@ -104,7 +104,7 @@ export function drawHud(ctx, s, w, h) {
     ctx.font = '10px Georgia, serif';
     ctx.fillStyle = 'rgba(245, 233, 200, 0.7)';
     ctx.fillText(label, sx, 28);
-    ctx.font = 'bold 22px Georgia, serif';
+    ctx.font = 'bold 24px Georgia, serif';
     ctx.fillStyle = CREAM;
     ctx.fillText(value, sx, 54);
     if (unit) {
@@ -175,6 +175,10 @@ export function drawHud(ctx, s, w, h) {
 
   // ---- Bottom instrument cluster ----
   const by = h - 128;
+  // One continuous dashboard strip behind the whole cluster, so the
+  // instruments read as a cockpit panel instead of floating boxes.
+  // It runs to the bottom edge so the dial labels sit on the panel too.
+  panel(ctx, 12, by - 14, w - 24, 140, 12);
   // Throttle bar (left).
   panel(ctx, 12, by - 8, 150, 104, 10);
   ctx.textAlign = 'left';
@@ -278,7 +282,7 @@ export function drawHud(ctx, s, w, h) {
 
   // ---- End screens ----
   if (s.phase === 'landed' || s.phase === 'over') {
-    ctx.fillStyle = 'rgba(8, 26, 32, 0.72)';
+    ctx.fillStyle = 'rgba(8, 26, 32, 0.62)';
     ctx.fillRect(0, 0, w, h);
     const title = s.phase === 'landed' ? 'A GOLDEN TOUCHDOWN' : 'SORTIE OVER';
     const lines = s.phase === 'landed'

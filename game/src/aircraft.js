@@ -10,7 +10,7 @@ function fuselageTexture() {
   const canvas = document.createElement('canvas');
   canvas.width = 1024; canvas.height = 256;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#f3e6c8';
+  ctx.fillStyle = '#faf3dd';
   ctx.fillRect(0, 0, 1024, 256);
   // Panel lines (v runs tail at canvas bottom, nose at canvas top).
   ctx.strokeStyle = 'rgba(120, 84, 48, 0.35)';
@@ -18,8 +18,9 @@ function fuselageTexture() {
   for (let y = 24; y < 256; y += 28) {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(1024, y); ctx.stroke();
   }
-  // Orange cheatline + gold pinstripes across the cabin band.
-  ctx.fillStyle = '#e8722a';
+  // Red cheatline + gold pinstripes across the cabin band: red on cream
+  // reads at a glance against the orange desert, where orange did not.
+  ctx.fillStyle = '#c22e2e';
   ctx.fillRect(0, 96, 1024, 42);
   ctx.fillStyle = '#ffc23d';
   ctx.fillRect(0, 90, 1024, 5);
@@ -233,6 +234,17 @@ export function buildAircraft() {
     propeller.add(blade);
   }
   propeller.position.set(0, 0, 4.35);
+  // Blur disc: a faint translucent disc at the prop plane so the spinning
+  // propeller reads as a disc in stills, not a thin stick.
+  const blurDisc = new THREE.Mesh(
+    new THREE.CircleGeometry(2.9, 32),
+    new THREE.MeshBasicMaterial({
+      color: '#2b2622', transparent: true, opacity: 0.14,
+      side: THREE.DoubleSide, depthWrite: false,
+    }),
+  );
+  blurDisc.position.z = 0.5;
+  propeller.add(blurDisc);
   group.add(propeller);
 
   // Exhaust stubs under the nose, seated in the cowling: the fuselage radius

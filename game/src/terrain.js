@@ -145,7 +145,9 @@ function buildGround(noise) {
 
 function buildRiver() {
   // A ribbon of water following the river spline, riding just above the
-  // canyon floor it carved — never buried under the terrain.
+  // canyon floor it carved — never buried under the terrain. A wider sandy
+  // bank ribbon runs underneath so the channel reads as a river, not a line.
+  const group = new THREE.Group();
   const points = [];
   for (let i = 0; i < RIVER_PATH.length; i += 1) {
     const [x, z] = RIVER_PATH[i];
@@ -153,31 +155,42 @@ function buildRiver() {
   }
   const curve = new THREE.CatmullRomCurve3(points);
   const segments = 220;
-  const width = 74;
-  const positions = [];
-  const indices = [];
   const up = new THREE.Vector3(0, 1, 0);
-  for (let i = 0; i <= segments; i += 1) {
-    const t = i / segments;
-    const p = curve.getPoint(t);
-    const tangent = curve.getTangent(t);
-    const side = new THREE.Vector3().crossVectors(tangent, up).normalize();
-    positions.push(p.x - side.x * width / 2, p.y, p.z - side.z * width / 2);
-    positions.push(p.x + side.x * width / 2, p.y, p.z + side.z * width / 2);
-    if (i < segments) {
-      const a = i * 2;
-      indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+  const ribbon = (width, yOff) => {
+    const positions = [];
+    const indices = [];
+    for (let i = 0; i <= segments; i += 1) {
+      const t = i / segments;
+      const p = curve.getPoint(t);
+      const tangent = curve.getTangent(t);
+      const side = new THREE.Vector3().crossVectors(tangent, up).normalize();
+      positions.push(p.x - side.x * width / 2, p.y + yOff, p.z - side.z * width / 2);
+      positions.push(p.x + side.x * width / 2, p.y + yOff, p.z + side.z * width / 2);
+      if (i < segments) {
+        const a = i * 2;
+        indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
     }
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geo.setIndex(indices);
-  geo.computeVertexNormals();
-  const mat = new THREE.MeshStandardMaterial({
-    color: PALETTE.river, roughness: 0.25, metalness: 0.35,
-    transparent: true, opacity: 0.92, emissive: PALETTE.riverDeep, emissiveIntensity: 0.35,
-  });
-  return new THREE.Mesh(geo, mat);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    return geo;
+  };
+  const bank = new THREE.Mesh(
+    ribbon(200, -1),
+    new THREE.MeshStandardMaterial({ color: PALETTE.sandLight, roughness: 1, metalness: 0 }),
+  );
+  group.add(bank);
+  const water = new THREE.Mesh(
+    ribbon(120, 0),
+    new THREE.MeshStandardMaterial({
+      color: PALETTE.river, roughness: 0.2, metalness: 0.35,
+      transparent: true, opacity: 0.95, emissive: PALETTE.riverDeep, emissiveIntensity: 0.6,
+    }),
+  );
+  group.add(water);
+  return group;
 }
 
 function buildSkyDome() {
@@ -205,11 +218,11 @@ function buildSun() {
   // One big low sun with a soft halo, west of the course.
   const group = new THREE.Group();
   const core = new THREE.Mesh(
-    new THREE.CircleGeometry(260, 48),
+    new THREE.CircleGeometry(200, 48),
     new THREE.MeshBasicMaterial({ color: PALETTE.sunCore, fog: false }),
   );
   const halo = new THREE.Mesh(
-    new THREE.CircleGeometry(430, 48),
+    new THREE.CircleGeometry(320, 48),
     new THREE.MeshBasicMaterial({
       color: PALETTE.sunGlow, fog: false, transparent: true, opacity: 0.35,
     }),
@@ -229,17 +242,17 @@ function buildClouds(rng) {
     transparent: true, opacity: 0.9, emissive: '#ffb98a', emissiveIntensity: 0.25,
   });
   const puff = new THREE.IcosahedronGeometry(1, 1);
-  for (let i = 0; i < 26; i += 1) {
+  for (let i = 0; i < 36; i += 1) {
     const cloud = new THREE.Group();
     const count = 3 + Math.floor(rng() * 4);
     for (let j = 0; j < count; j += 1) {
-      const s = 34 + rng() * 60;
+      const s = 40 + rng() * 70;
       const m = new THREE.Mesh(puff, mat);
       m.position.set((j - count / 2) * s * 0.9, (rng() - 0.5) * 18, (rng() - 0.5) * 26);
       m.scale.set(s, s * 0.42, s * 0.7);
       cloud.add(m);
     }
-    cloud.position.set((rng() - 0.5) * 5200, 520 + rng() * 260, -4200 + rng() * 4400);
+    cloud.position.set((rng() - 0.5) * 5200, 430 + rng() * 330, -4200 + rng() * 4400);
     group.add(cloud);
   }
   group.userData.drift = 1.6; // m/s
@@ -389,12 +402,13 @@ export function buildTerrain(seed = WORLD.seed) {
   const noise = SHARED_NOISE;
   const group = new THREE.Group();
   group.add(buildSkyDome());
-  group.add(buildSun());
+  const sun = buildSun();
+  group.add(sun);
   group.add(buildGround(noise));
   group.add(buildRiver());
   group.add(buildPeaks());
   const clouds = buildClouds(rng);
   group.add(clouds);
   group.add(buildDressing(noise, rng));
-  return { group, clouds, groundHeightAt: (x, z) => groundHeightAt(x, z, noise) };
+  return { group, clouds, sun, groundHeightAt: (x, z) => groundHeightAt(x, z, noise) };
 }

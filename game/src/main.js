@@ -53,7 +53,9 @@ sizeHud();
 
 // ---- Scene ----
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(new THREE.Color(PALETTE.fog), 420, 1800);
+// Far fog so the layered peaks read on the horizon instead of being
+// swallowed: the purple ridge ring is the depth the top entries show.
+scene.fog = new THREE.Fog(new THREE.Color(PALETTE.fog), 600, 4200);
 const hemi = new THREE.HemisphereLight(PALETTE.skyDusk, '#7a5a44', 0.9);
 scene.add(hemi);
 const sun = new THREE.DirectionalLight(PALETTE.sun, 2.4);
@@ -107,9 +109,9 @@ function resetCamera() {
   // leave the camera flying back from the crash site for seconds.
   const yaw = state.heading;
   camPos.set(
-    state.pos.x - Math.sin(yaw) * 14,
-    state.pos.y + 4.5,
-    state.pos.z - Math.cos(yaw) * 14,
+    state.pos.x - Math.sin(yaw) * 12.5,
+    state.pos.y + 4.2,
+    state.pos.z - Math.cos(yaw) * 12.5,
   );
   camTarget.set(
     state.pos.x + Math.sin(yaw) * 40,
@@ -131,9 +133,9 @@ function updateCamera(dt) {
   }
   const yaw = state.heading + lookYaw;
   const behind = new THREE.Vector3(
-    state.pos.x - Math.sin(yaw) * 14,
-    state.pos.y + 4.5 + lookPitch * 8,
-    state.pos.z - Math.cos(yaw) * 14,
+    state.pos.x - Math.sin(yaw) * 12.5,
+    state.pos.y + 4.2 + lookPitch * 8,
+    state.pos.z - Math.cos(yaw) * 12.5,
   );
   const ground = groundHeightAt(behind.x, behind.z) + 3;
   if (behind.y < ground) behind.y = ground;
@@ -149,6 +151,11 @@ function updateCamera(dt) {
   // The sun shadow follows the plane so the canyon stays lit near us.
   sun.position.set(state.pos.x + 140, state.pos.y + 190, state.pos.z - 90);
   sun.target.position.copy(state.pos);
+  // The sunset disc rides ahead-left of the plane, low on the horizon, so
+  // every shot has the golden-hour sun in frame (the top entries all do).
+  // It is a flat disc, so it turns to face the camera each frame.
+  terrain.sun.position.set(state.pos.x - 1050, state.pos.y + 420, state.pos.z - 1750);
+  terrain.sun.lookAt(camera.position);
 }
 
 function handleEvents(events) {
