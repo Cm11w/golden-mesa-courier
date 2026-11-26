@@ -10,7 +10,12 @@ import { buildDossier } from './vendor/makefun-game.ts';
 const OUT = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 const ROOT = new URL('.', import.meta.url).pathname;
 
-rmSync(OUT, { recursive: true, force: true });
+// /output is a mount point on the grader: removing it wholesale fails with
+// EBUSY (a mount point cannot be removed), so only the artifacts this program
+// writes are cleared — never the directory itself.
+for (const name of ['game', 'screenshots', 'dossier.json']) {
+  rmSync(join(OUT, name), { recursive: true, force: true });
+}
 mkdirSync(OUT, { recursive: true });
 
 for (const name of ['game', 'screenshots']) {
