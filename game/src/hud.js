@@ -174,11 +174,10 @@ export function drawHud(ctx, s, w, h) {
   ctx.fillText(s.phase === 'landed' ? 'ON THE GROUND' : `GEAR ${s.gearDown ? 'DOWN' : 'UP'}`, w - 216, 146);
 
   // ---- Bottom instrument cluster ----
+  // Floating panels only — NO full-width strip. The r2 strip ran to the
+  // bottom edge and hid the aircraft's tail and the scene below it.
+  // Each instrument keeps its own small panel; the gaps show the plane.
   const by = h - 128;
-  // One continuous dashboard strip behind the whole cluster, so the
-  // instruments read as a cockpit panel instead of floating boxes.
-  // It runs to the bottom edge so the dial labels sit on the panel too.
-  panel(ctx, 12, by - 14, w - 24, 140, 12);
   // Throttle bar (left).
   panel(ctx, 12, by - 8, 150, 104, 10);
   ctx.textAlign = 'left';
