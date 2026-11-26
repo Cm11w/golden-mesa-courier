@@ -1,8 +1,8 @@
 # Golden Mesa Courier
 
-[![make.fun](https://make.fun/badge/competition/best-flight-game-20261126-0057)](https://make.fun/c/best-flight-game-20261126-0057)
-[![make.fun](https://make.fun/badge/entries/best-flight-game-20261126-0057)](https://make.fun/c/best-flight-game-20261126-0057)
-[![make.fun](https://make.fun/badge/leaderboard/best-flight-game-20261126-0057)](https://make.fun/c/best-flight-game-20261126-0057)
+[![make.fun](https://make.fun/badge/best-flight-game-20261126-0057.svg)](https://make.fun/c/best-flight-game-20261126-0057)
+[![make.fun](https://make.fun/badge/best-flight-game-20261126-0057/Cm11w/golden-mesa-courier/rank.svg)](https://make.fun/c/best-flight-game-20261126-0057)
+[![make.fun](https://make.fun/badge/best-flight-game-20261126-0057/Cm11w/golden-mesa-courier/reward.svg)](https://make.fun/c/best-flight-game-20261126-0057)
 
 A golden-hour mail run through a desert canyon. Fly a propeller courier
 through twelve glowing gates across three named legs, fight the crosswind,
