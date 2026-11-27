@@ -79,17 +79,22 @@ function finTexture(accent) {
   return tex;
 }
 
-function wingHalf(span, rootChord, tipChord, thickness, material, sweep = 0) {
+function wingHalf(span, rootChord, tipChord, thickness, material, sweep = 0, mirror = false) {
   // Tapered, round-tipped half wing, extruded so it has a real airfoil edge.
   // `sweep` slides the tip chord toward the tail (-Z after rotateX), so a
   // delta wing reads as one big swept triangle and a swept wing as a
   // classic fighter planform — never a straight prop-era wing.
+  // `mirror` builds the -X half by negating the shape's X coordinates, so
+  // the chord keeps its orientation (sweep still toward the tail) on both
+  // sides. NEVER mirror with rotation.y = PI: that maps (x,y,z) ->
+  // (-x,y,-z), flipping the chord so the -X tip sweeps toward the nose.
+  const m = mirror ? -1 : 1;
   const shape = new THREE.Shape();
-  shape.moveTo(0, -rootChord / 2);
-  shape.lineTo(span - 0.9, -tipChord / 2 - sweep);
-  shape.quadraticCurveTo(span, -sweep, span - 0.9, tipChord / 2 - sweep);
-  shape.lineTo(0, rootChord / 2);
-  shape.quadraticCurveTo(-0.25, 0, 0, -rootChord / 2);
+  shape.moveTo(m * 0, -rootChord / 2);
+  shape.lineTo(m * (span - 0.9), -tipChord / 2 - sweep);
+  shape.quadraticCurveTo(m * span, -sweep, m * (span - 0.9), tipChord / 2 - sweep);
+  shape.lineTo(m * 0, rootChord / 2);
+  shape.quadraticCurveTo(m * -0.25, 0, m * 0, -rootChord / 2);
   const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.08, bevelSegments: 2 });
   geo.rotateX(Math.PI / 2); // chord -> Z, thickness -> Y
   // After rotateX the slab sits low (y in [-thickness-0.03, +0.03]); shift it
@@ -160,42 +165,52 @@ export function buildAircraft(variant = {}) {
   }
 
   // Main wing: swept/delta, nearly flat (jets don't need prop dihedral).
-  // wingHalf spans +X only, so the -X half is mirrored with rotation.y = PI.
+  // wingHalf spans +X only, so the -X half is built mirrored (mirror=true);
+  // rotation.z is side-signed so the dihedral lifts the tip on both sides.
   const DIHEDRAL = 0.05;
   const wingZ = -0.2 * L;
   const tipY = v.wingY + Math.sin(DIHEDRAL) * (v.span + 1.0);
+  // Stripe-tip geometry, shared by the stripe mesh and the nav lights:
+  // the stripe root is BURIED 0.7 m inside the main wingtip (overlap,
+  // not a butt joint) and the stripe is lengthened by the same 0.7 m,
+  // so its outer apex stays where it was. Apex |x| =
+  // span - INSET + (LEN - 0.45) + 0.08 = span + 0.63, where 0.45 is how
+  // far the quadratic tip curve pulls the apex back from its control
+  // point and 0.08 is the extrude bevel. The old root-at-span joint left
+  // a 0.06 m gap at mid-chord and ~0.9 m at the chord ends (the round
+  // wingtip recedes), so the red read as a floating chip; burying the
+  // root overlaps the cream across the full chord.
+  const STRIPE_INSET = 0.7;
+  const STRIPE_LEN = 1.7;
+  const stripeApexX = v.span - STRIPE_INSET + (STRIPE_LEN - 0.45) + 0.08;
   for (const side of [-1, 1]) {
-    const half = wingHalf(v.span, v.rootChord, v.tipChord, 0.16, creamPlain, v.sweep);
+    const half = wingHalf(v.span, v.rootChord, v.tipChord, 0.16, creamPlain, v.sweep, side < 0);
     half.position.set(side * 0.1, v.wingY, wingZ);
-    if (side < 0) half.rotation.y = Math.PI; // mirror to -X
-    half.rotation.z = DIHEDRAL;
+    half.rotation.z = side * DIHEDRAL;
     group.add(half);
-    // Stripe tip: starts where the main wing ends and keeps the same dihedral,
-    // so its root sits at the main wing's tip height.
-    const tip = wingHalf(1.0, v.tipChord, v.tipChord * 0.8, 0.17, stripe, 0);
-    tip.position.set(side * v.span, tipY, wingZ - v.sweep);
-    if (side < 0) tip.rotation.y = Math.PI;
-    tip.rotation.z = DIHEDRAL;
+    // Stripe tip: root buried inside the wingtip (see STRIPE_INSET), same
+    // dihedral, so its root sits at the main wing's tip height.
+    const tip = wingHalf(STRIPE_LEN, v.tipChord, v.tipChord * 0.8, 0.17, stripe, 0, side < 0);
+    tip.position.set(side * (v.span - STRIPE_INSET), tipY, wingZ - v.sweep);
+    tip.rotation.z = side * DIHEDRAL;
     group.add(tip);
   }
 
   // Canard foreplanes (interceptor only): small swept surfaces by the nose.
   if (v.canard) {
     for (const side of [-1, 1]) {
-      const canard = wingHalf(1.8, 0.9, 0.45, 0.1, creamPlain, 0.7);
+      const canard = wingHalf(1.8, 0.9, 0.45, 0.1, creamPlain, 0.7, side < 0);
       canard.position.set(side * 0.1, 0.3 * R, 2.4 * L);
-      if (side < 0) canard.rotation.y = Math.PI;
-      canard.rotation.z = 0.05;
+      canard.rotation.z = side * 0.05;
       group.add(canard);
     }
   }
 
   // Tail: swept stabilisers + fin(s), accent tips, registration plates.
   for (const side of [-1, 1]) {
-    const stab = wingHalf(2.6, 1.25, 0.7, 0.11, creamPlain, 1.2);
+    const stab = wingHalf(2.6, 1.25, 0.7, 0.11, creamPlain, 1.2, side < 0);
     stab.position.set(side * 0.08, 0.28 * R, -3.55 * L);
-    if (side < 0) stab.rotation.y = Math.PI; // mirror to -X
-    stab.rotation.z = 0.05;
+    stab.rotation.z = side * 0.05;
     group.add(stab);
   }
   const finShape = new THREE.Shape();
@@ -338,7 +353,11 @@ export function buildAircraft(variant = {}) {
   // Navigation lights: red left (port), green right (starboard), white tail.
   // The nose faces +Z, so the plane's left side is +X in local space — the
   // red light sits at the +X tip and the green at the -X tip.
-  const tipX = v.span + 0.95;
+  // The bulb sits 0.05 m INSIDE the stripe's real outer apex
+  // (stripeApexX = span + 0.63), so the r = 0.09 bulb intersects the red
+  // tip instead of floating beyond it. NEVER span + 0.95 again: the
+  // stripe apex never reached that far (it stops at span + 0.63).
+  const tipX = stripeApexX - 0.05;
   const navLights = {};
   const lightGeo = new THREE.SphereGeometry(0.09, 8, 6);
   navLights.left = new THREE.Mesh(lightGeo, new THREE.MeshStandardMaterial({ color: '#ff2e2e', emissive: '#ff2e2e', emissiveIntensity: 2.5 }));
