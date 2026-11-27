@@ -75,16 +75,65 @@ export function buildRunway() {
   number.position.set(x, y + 0.32, z + length / 2 - 62);
   group.add(number);
 
-  // Edge lights: warm lamps on short posts down both sides.
-  const lampMat = new THREE.MeshStandardMaterial({ color: '#ffb347', emissive: '#ffb347', emissiveIntensity: 2.2 });
+  // Edge lights: warm lamps on short posts down both sides — bigger and
+  // brighter now, so the strip reads as lit in the landing shot.
+  const lampMat = new THREE.MeshStandardMaterial({ color: '#ffb347', emissive: '#ffb347', emissiveIntensity: 3.0 });
   const postMat = new THREE.MeshStandardMaterial({ color: '#3a3a3a', roughness: 0.8 });
   for (let d = -length / 2 + 12; d <= length / 2 - 12; d += 52) {
     for (const side of [-1, 1]) {
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 2.4, 6), postMat);
       post.position.set(x + side * (width / 2 + 4), y + 1.2, z + d);
-      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.55, 8, 6), lampMat);
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.8, 8, 6), lampMat);
       lamp.position.set(x + side * (width / 2 + 4), y + 2.6, z + d);
       group.add(post, lamp);
+    }
+  }
+
+  // PAPI: four light boxes beside the threshold (left side, as the pilot
+  // sees it on final). Two white + two red = on the glidepath; the lenses
+  // are big emissive spheres so they read from 400 m out. The top entries
+  // all show PAPI/ILS guidance — this is the visible half of it.
+  const papiZ = z + length / 2 - 60;
+  const papiX = x - width / 2 - 9;
+  const whiteLens = new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 3.5 });
+  const redLens = new THREE.MeshStandardMaterial({ color: '#ff2e2e', emissive: '#ff2e2e', emissiveIntensity: 3.5 });
+  for (let i = 0; i < 4; i += 1) {
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(2.2, 1.6, 1.2),
+      new THREE.MeshStandardMaterial({ color: '#22201e', roughness: 0.8 }),
+    );
+    box.position.set(papiX + i * 3.2, y + 1.0, papiZ);
+    const lens = new THREE.Mesh(new THREE.SphereGeometry(0.85, 10, 8), i < 2 ? redLens : whiteLens);
+    lens.position.set(papiX + i * 3.2, y + 1.1, papiZ + 0.7);
+    group.add(box, lens);
+  }
+
+  // Approach lights: a white "rabbit" running 150 m out from the threshold
+  // down the extended centreline, with a crossbar — the first thing a pilot
+  // sees on final, and the brightest line in the landing shot.
+  const appMat = new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 3.5 });
+  for (let d = 30; d <= 150; d += 30) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 2.0, 6), postMat);
+    post.position.set(x, y + 1.0, z + length / 2 + d);
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.7, 8, 6), appMat);
+    lamp.position.set(x, y + 2.2, z + length / 2 + d);
+    group.add(post, lamp);
+  }
+  for (const side of [-1, 1]) {
+    for (const off of [-12, -6, 6, 12]) {
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 6), appMat);
+      lamp.position.set(x + off, y + 2.2, z + length / 2 + 90);
+      group.add(lamp);
+    }
+  }
+
+  // Touchdown zone: pairs of white bars 150 m and 300 m past the threshold.
+  for (const td of [150, 300]) {
+    for (const side of [-1, 1]) {
+      const bar = new THREE.Mesh(new THREE.PlaneGeometry(4, 20), paint);
+      bar.rotation.x = -Math.PI / 2;
+      bar.position.set(x + side * 10, y + 0.3, z + length / 2 - td);
+      group.add(bar);
     }
   }
 

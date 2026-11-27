@@ -72,8 +72,13 @@ function needle(ctx, cx, cy, r, angle, color = GOLD, width = 3) {
   ctx.fill();
 }
 
-/** Draw the HUD for one frame. `s` is the world state, `w`/`h` the canvas size. */
-export function drawHud(ctx, s, w, h) {
+/** Draw the HUD for one frame. `s` is the world state, `w`/`h` the canvas size.
+ * `cockpit` draws the cockpit layout instead: the 3D dashboard (cockpit.js)
+ * carries the frame, and the four live gauges sit on it in a row — the
+ * chase dials, throttle/fuel panels, radar and data bar are hidden, since
+ * the cockpit gauges replace them. Top bar, objective, compass, airframe
+ * panel and callouts stay in both views. */
+export function drawHud(ctx, s, w, h, cockpit = false) {
   ctx.clearRect(0, 0, w, h);
   const leg = LEGS[s.leg];
   const timeLeft = Math.max(0, s.timeLimit - s.elapsed);
@@ -88,7 +93,7 @@ export function drawHud(ctx, s, w, h) {
   ctx.fillText('GOLDEN MESA', 28, 36);
   ctx.font = '11px Georgia, serif';
   ctx.fillStyle = 'rgba(245, 233, 200, 0.75)';
-  ctx.fillText(`C O U R I E R · ${s.callsign || 'N427GM'}`, 28, 54);
+  ctx.fillText(`C O U R I E R · ${s.callsign || 'N427GM'}${cockpit ? ' · COCKPIT [C]' : ''}`, 28, 54);
   const stats = [
     ['ALT', `${Math.round(s.altitudeFt)}`, 'FT'],
     ['SPD', `${Math.round(s.speedKt)}`, 'KT'],
@@ -194,12 +199,15 @@ export function drawHud(ctx, s, w, h) {
   ctx.fillText(s.phase === 'landed' ? 'ON THE GROUND' : `GEAR ${s.gearDown ? 'DOWN' : 'UP'}`, w - 216, 162);
 
   // ---- Left instrument column (dials) + bottom corners (throttle/fuel) ----
+  // Chase view only: in the cockpit the 3D dashboard carries the panel and
+  // the four cockpit gauges (drawn below) replace these.
   // Floating panels only — NO full-width strip. The r2 strip ran to the
   // bottom edge and hid the aircraft's tail and the scene below it.
   // Each instrument keeps its own small panel; the gaps show the plane.
   // The 3 round dials sit in a left column (CEO 26 Nov ~21:59 WIB), stacked
   // between the leg panel and the throttle panel, at the 3 marked spots.
   const by = h - 128;
+  if (!cockpit) {
   // Throttle bar (left).
   panel(ctx, 12, by - 8, 150, 104, 10);
   ctx.textAlign = 'left';
@@ -221,8 +229,11 @@ export function drawHud(ctx, s, w, h) {
   ctx.font = '11px Georgia, serif';
   ctx.fillStyle = 'rgba(245, 233, 200, 0.7)';
   ctx.fillText('W / S', 26, by + 82);
+  } // end chase-only throttle panel
 
   // ---- Mini-map / radar (right, above the fuel panel) ----
+  // Chase view only.
+  if (!cockpit) {
   // Plane-centred, north-up, 1.2 km radius: the jet sits in the middle as a
   // small arrow on its heading, the next gate is gold, the next drop target
   // green, the runway a white tick at the top. Blips clamp to the rim.
@@ -280,8 +291,11 @@ export function drawHud(ctx, s, w, h) {
     ctx.textAlign = 'center';
     ctx.fillText('RADAR · 1.2 KM', rcx, rcy - rr - 6);
   }
+  } // end chase-only radar
 
   // ---- Bottom data bar (centre, between throttle and fuel) ----
+  // Chase view only: the cockpit gauges carry these numbers instead.
+  if (!cockpit) {
   // One line: speed, altitude, AGL, vertical speed, G-load, throttle + A/B.
   // Sits above the throttle/fuel panels, clear of the dial column (x=108)
   // and of the radar above the fuel panel.
@@ -295,8 +309,12 @@ export function drawHud(ctx, s, w, h) {
     ctx.textAlign = 'center';
     ctx.fillText(data, w / 2, h - 118);
   }
+  } // end chase-only data bar
 
   // Airspeed dial — left column, top.
+  // Chase view only (the three dials + fuel gauge); the cockpit draws its
+  // own four gauges on the dashboard below.
+  if (!cockpit) {
   dial(ctx, 108, 226, 38, 'AIRSPEED', 'KNOTS');
   const spdAngle = -Math.PI * 0.75 + (Math.min(180, s.speedKt) / 180) * Math.PI * 1.5;
   needle(ctx, 108, 226, 38, spdAngle);
@@ -358,6 +376,49 @@ export function drawHud(ctx, s, w, h) {
   ctx.font = '11px Georgia, serif';
   ctx.fillStyle = 'rgba(245, 233, 200, 0.7)';
   ctx.fillText(s.fuel <= LOW_FUEL_AT ? 'LOW FUEL — LAND SOON' : `RINGS TOP UP +${FUEL_RING_BONUS}%`, w - 216, by + 82);
+  } // end chase-only dials + fuel gauge
+
+  // ---- Cockpit gauges (on the 3D dashboard) ----
+  // Four live dials in a row along the bottom, sitting on the dashboard
+  // panel: IAS, ALT, THR, HULL. Same dial/needle helpers as the chase
+  // view, so they can never go blank — the brief's cockpit asks for live
+  // gauges, and these are the ones that move.
+  if (cockpit) {
+    // Gauges sit high enough that their labels clear the bottom edge
+    // (dial label at cy+r+24, sub at cy+r+38).
+    const gy = h - 98;
+    const gx = [w / 2 - 252, w / 2 - 84, w / 2 + 84, w / 2 + 252];
+    dial(ctx, gx[0], gy, 42, 'AIRSPEED', 'KNOTS');
+    const spdA = -Math.PI * 0.75 + (Math.min(180, s.speedKt) / 180) * Math.PI * 1.5;
+    needle(ctx, gx[0], gy, 42, spdA);
+    ctx.fillStyle = CREAM;
+    ctx.font = 'bold 20px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(String(Math.round(s.speedKt)), gx[0], gy + 16);
+    dial(ctx, gx[1], gy, 42, 'ALTIMETER', 'FEET');
+    const altA = -Math.PI * 0.75 + ((s.altitudeFt % 1000) / 1000) * Math.PI * 1.5;
+    needle(ctx, gx[1], gy, 42, altA);
+    ctx.fillStyle = CREAM;
+    ctx.font = 'bold 18px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(String(Math.round(s.altitudeFt)), gx[1], gy + 16);
+    dial(ctx, gx[2], gy, 42, 'THROTTLE', s.afterburner ? 'AFTERBURNER' : 'PERCENT');
+    const thrA = -Math.PI * 0.75 + (s.throttle / 1) * Math.PI * 1.5;
+    needle(ctx, gx[2], gy, 42, thrA, s.afterburner ? '#ff7a1a' : GOLD);
+    ctx.fillStyle = s.afterburner ? '#ff7a1a' : CREAM;
+    ctx.font = 'bold 20px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${Math.round(s.throttle * 100)}%`, gx[2], gy + 16);
+    dial(ctx, gx[3], gy, 42, 'HULL', 'STRUCTURE');
+    const hull = s.hull ?? 100;
+    const hullA = -Math.PI * 0.75 + (hull / 100) * Math.PI * 1.5;
+    const hullColor = hull > 50 ? GREEN : hull >= 25 ? GOLD : RED;
+    needle(ctx, gx[3], gy, 42, hullA, hullColor);
+    ctx.fillStyle = hullColor;
+    ctx.font = 'bold 20px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${hull}%`, gx[3], gy + 16);
+  }
 
   // ---- Callout banner (centre, under the compass; flight only) ----
   if (s.phase === 'fly' && s.callout && s.calloutUntil > s.elapsed) {
@@ -374,11 +435,13 @@ export function drawHud(ctx, s, w, h) {
   }
 
   // ---- Hint line (early flight only, above the instrument cluster) ----
-  if (s.phase === 'fly' && s.elapsed < 7) {
+  // Chase view only: in the cockpit the view tag under the gauges carries
+  // the key hint instead.
+  if (!cockpit && s.phase === 'fly' && s.elapsed < 7) {
     ctx.fillStyle = 'rgba(245, 233, 200, 0.85)';
     ctx.font = '14px Georgia, serif';
     ctx.textAlign = 'center';
-    ctx.fillText('W / S throttle · ← → roll · ↑ ↓ pitch · SPACE drop mail · SHIFT afterburner · drag mouse to look', w / 2, h - 148);
+    ctx.fillText('W / S throttle · ← → roll · ↑ ↓ pitch · SPACE drop mail · SHIFT afterburner · C cockpit · drag mouse to look', w / 2, h - 148);
   }
 
   // NOTE: no canvas end screen here. When a sortie ends the DOM results

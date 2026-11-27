@@ -23,6 +23,8 @@ import { createInput } from './input.js';
 import { createMenu } from './menu.js';
 import { loadSelection, liveryById, modelById, variantFor } from './livery.js';
 import { buildDrops } from './drops.js';
+import { buildCockpit } from './cockpit.js';
+import { buildWeather } from './weather.js';
 
 const params = new URLSearchParams(window.location.search);
 const shotId = params.get('shot');
@@ -83,6 +85,9 @@ const runway = buildRunway();
 scene.add(runway.group);
 const drops = buildDrops();
 scene.add(drops.group);
+// Leg-2 storm rain (visible only on leg 2 — see renderFrame).
+const weather = buildWeather();
+scene.add(weather.group);
 
 // ---- Aircraft + selection ----
 // The menu's choice (or ?model=/?color= overrides, used by the screenshots)
@@ -113,10 +118,16 @@ const camPos = new THREE.Vector3(0, 110, -240);
 const camTarget = new THREE.Vector3(0, 96, -160);
 camera.position.copy(camPos);
 camera.lookAt(camTarget);
+// The cockpit frame is a child of the camera, so it rides with the view;
+// the camera must be in the scene for its children to render.
+const cockpit = buildCockpit();
+camera.add(cockpit.group);
+scene.add(camera);
 
 // ---- State ----
 let state = shotMode ? stageShot(shotId) : createWorld();
 let screen = shotMode ? 'shot' : 'menu'; // menu | game | results | shot
+let cockpitView = false; // C toggles chase <-> cockpit (game screen only)
 const input = createInput(canvas);
 const audio = buildAudio();
 let frame = 0;
@@ -139,8 +150,8 @@ function placeAircraft() {
   // Cone length is the mesh's local Y (rotated to -Z); width is local X/Z.
   const ab = !!state.afterburner;
   const flick = 1 + 0.14 * Math.sin(frame * 0.9) + 0.06 * Math.sin(frame * 2.3);
-  const abLen = (ab ? 1.6 : 0.7) * flick;
-  const abWid = (ab ? 1.25 : 0.75) * flick;
+  const abLen = (ab ? 1.9 : 0.7) * flick;
+  const abWid = (ab ? 1.4 : 0.75) * flick;
   for (const c of aircraft.afterburner.userData.cones) c.scale.set(abWid, abLen, abWid);
   for (const g of aircraft.afterburner.userData.glows) g.scale.set(abWid, abWid, 1);
 }
@@ -151,7 +162,9 @@ function placeAircraft() {
 // ground heights never move, only the light does.
 const LEG_ATMOS = [
   { fog: new THREE.Color(PALETTE.fog), near: 600, far: 4200, sun: 2.4, hemi: 0.9 },
-  { fog: new THREE.Color('#b98a7a'), near: 420, far: 3400, sun: 2.2, hemi: 0.85 },
+  // Leg 2 is the storm leg: darker, closer fog, dimmer sun — the rain
+  // (weather.js) + the river mist read as weather, not a clear day.
+  { fog: new THREE.Color('#7d5f6e'), near: 380, far: 3000, sun: 1.8, hemi: 0.75 },
   { fog: new THREE.Color('#d96a4a'), near: 600, far: 4200, sun: 1.9, hemi: 0.8 },
 ];
 const _fogTarget = new THREE.Color();
@@ -188,6 +201,40 @@ function resetCamera() {
 }
 
 function updateCamera(dt) {
+  // Cockpit view: ride in the canopy, looking along the nose. The camera
+  // sits ahead of the canopy (aircraft local 0, 0.95, 2.2) and takes the
+  // aircraft's own orientation (YXZ: heading, -pitch, roll), so the horizon
+  // banks with the plane; mouse look adds a small yaw/pitch on top. NOTE
+  // the camera looks down its local -Z while the nose is at local +Z, so
+  // the quaternion is the aircraft's turned 180° about Y — without that
+  // the camera looks at the tail (the first cockpit shot proved it: the
+  // ring ahead was missing, ring 1's mirrored label showed instead).
+  // The aircraft group is HIDDEN in cockpit view: the camera would
+  // otherwise sit inside the fuselage and the lathe interior (red
+  // cheatline) fills the frame. The 3D dashboard + nose cowling
+  // (cockpit.js) carry the foreground instead.
+  if (cockpitView && screen !== 'menu') {
+    const e = new THREE.Euler(-state.pitch, state.heading, state.roll, 'YXZ');
+    const q = new THREE.Quaternion().setFromEuler(e);
+    q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI));
+    const local = new THREE.Vector3(0, 0.95, 2.2).applyQuaternion(new THREE.Quaternion().setFromEuler(e));
+    camera.position.copy(state.pos).add(local);
+    camera.quaternion.copy(q);
+    const look = input.look();
+    lookYaw = THREE.MathUtils.clamp(lookYaw + look.yaw, -0.9, 0.9);
+    lookPitch = THREE.MathUtils.clamp(lookPitch + look.pitch, -0.3, 0.3);
+    if (!shotMode) {
+      lookYaw *= Math.max(0, 1 - dt * 0.8);
+      lookPitch *= Math.max(0, 1 - dt * 0.8);
+    }
+    camera.rotateY(lookYaw);
+    camera.rotateX(lookPitch);
+    sun.position.set(state.pos.x + 140, state.pos.y + 190, state.pos.z - 90);
+    sun.target.position.copy(state.pos);
+    terrain.sun.position.set(state.pos.x - 1050, state.pos.y + 420, state.pos.z - 1750);
+    terrain.sun.lookAt(camera.position);
+    return;
+  }
   const fwd = new THREE.Vector3(Math.sin(state.heading), 0, Math.cos(state.heading));
   const look = input.look();
   lookYaw = THREE.MathUtils.clamp(lookYaw + look.yaw, -1.1, 1.1);
@@ -197,10 +244,19 @@ function updateCamera(dt) {
     lookPitch *= Math.max(0, 1 - dt * 0.8);
   }
   const yaw = state.heading + lookYaw;
+  // Burner cam (the afterburner screenshot): further back, lower, and
+  // OFFSET TO THE SIDE than the chase cam. Straight behind, the flame
+  // tongues point at the lens and read as a dot; from this rear-quarter
+  // angle their length shows in profile, and the lower framing keeps them
+  // above the bottom edge.
+  const burner = state.camMode === 'burner';
+  const behindDist = burner ? 16 : 12.5;
+  const behindHeight = burner ? 2.0 : 4.2;
+  const sideOff = burner ? 7 : 0;
   const behind = new THREE.Vector3(
-    state.pos.x - Math.sin(yaw) * 12.5,
-    state.pos.y + 4.2 + lookPitch * 8,
-    state.pos.z - Math.cos(yaw) * 12.5,
+    state.pos.x - Math.sin(yaw) * behindDist + Math.cos(yaw) * sideOff,
+    state.pos.y + behindHeight + lookPitch * 8,
+    state.pos.z - Math.cos(yaw) * behindDist - Math.sin(yaw) * sideOff,
   );
   const ground = groundHeightAt(behind.x, behind.z) + 3;
   if (behind.y < ground) behind.y = ground;
@@ -254,6 +310,12 @@ function handleEvents(events) {
 function renderFrame(withHud = true) {
   frame += 1;
   placeAircraft();
+  // Cockpit frame shows only in cockpit view on the game screen; the
+  // aircraft itself hides there (see updateCamera).
+  cockpit.group.visible = cockpitView && screen !== 'menu';
+  aircraft.group.visible = !cockpitView || screen === 'menu';
+  // Storm rain only on leg 2, following the camera.
+  weather.update(camera.position, 1 / 60, state.leg === 1 && screen !== 'menu');
   const nextRing = state.ringsCleared < 12 ? rings.rings[state.ringsCleared] : null;
   // Cleared rings turn green so the course shows how far the sortie has got.
   rings.rings.forEach((ring, i) => { ring.cleared = i < state.ringsCleared; });
@@ -268,7 +330,7 @@ function renderFrame(withHud = true) {
   // and the parcels follow the falling mail.
   drops.update(state, state.elapsed);
   renderer.render(scene, camera);
-  if (withHud) drawHud(hudCtx, hudState(state), hudCanvas.width, hudCanvas.height);
+  if (withHud) drawHud(hudCtx, hudState(state), hudCanvas.width, hudCanvas.height, cockpitView);
   else hudCtx.clearRect(0, 0, hudCanvas.width, hudCanvas.height);
 }
 
@@ -310,6 +372,8 @@ window.__gmc = {
   rings: () => state.ringsCleared,
   hull: () => state.hull,
   afterburner: () => !!state.afterburner,
+  cockpit: () => cockpitView,
+  setCockpit: (v) => { cockpitView = !!v; },
   selection: () => ({ ...selection }),
   pos: () => [state.pos.x, state.pos.y, state.pos.z],
   start: () => menuElStart(),
@@ -333,6 +397,9 @@ function menuElStart() {
 
 // ---- Shot mode: stage, freeze, flag ready ----
 if (shotMode) {
+  // The cockpit shot flies from inside the canopy; the afterburner shot
+  // uses the burner cam (state.camMode, set by stageShot).
+  if (shotId === 'cockpit') cockpitView = true;
   if (shotId === 'menu') {
     // Title screen: parked plane, showcase camera, menu overlay, no HUD.
     menu.showMenu();
@@ -410,6 +477,8 @@ if (shotMode) {
       document.querySelector('#gmc-again')?.click();
     }
     if (controls.gear && screen === 'game') state.gearDown = !state.gearDown;
+    // C toggles cockpit <-> chase view (game screen only).
+    if (controls.cockpit && screen === 'game') cockpitView = !cockpitView;
     if (screen === 'game' && state.phase === 'fly') {
       // SPACE drops the mail — edge-triggered, only while flying.
       if (controls.drop) {

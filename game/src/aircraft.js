@@ -293,10 +293,11 @@ export function buildAircraft(variant = {}) {
     group.add(nozzle);
     const flame = new THREE.Group();
     flame.position.set(side * 0.5 * R, -0.12, -4.55 * L);
-    // Level, slightly splayed: the chase camera sits close behind and
-    // above, so anything tilted down or pushed a metre further back drops
-    // below the viewport — the burner must live at the nozzle exit itself.
-    flame.rotation.x = 0;
+    // Level-ish, slightly splayed and tilted DOWN: the chase camera sits
+    // close behind and above, so a flame pointing straight back at the lens
+    // is just a dot — 11° down puts the tongues under the tail silhouette
+    // where they read as flame, without dropping below the viewport.
+    flame.rotation.x = -0.2;
     flame.rotation.y = -side * 0.08; // splay outward
     const outer = new THREE.Mesh(new THREE.ConeGeometry(0.38, 1.6, 12), flameOuterMat);
     outer.rotation.x = -Math.PI / 2; // cone tip -> -Z (backward)

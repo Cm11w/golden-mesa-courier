@@ -45,17 +45,17 @@ export function buildRings() {
   for (let i = 0; i < RING_SPOTS.length; i += 1) {
     const [x, y, z] = RING_SPOTS[i];
     const ring = new THREE.Group();
-    const torus = new THREE.Mesh(new THREE.TorusGeometry(RING_RADIUS, 1.4, 14, 48), goldMat);
+    const torus = new THREE.Mesh(new THREE.TorusGeometry(RING_RADIUS, 1.9, 14, 48), goldMat);
     torus.castShadow = true;
-    const halo = new THREE.Mesh(new THREE.TorusGeometry(RING_RADIUS + 2.2, 2.6, 10, 48), glowMat);
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(RING_RADIUS + 3.0, 3.4, 10, 48), glowMat);
     ring.add(torus, halo);
     // Label plate above the ring: GATE 03, refreshed with the live distance.
     const labelTex = ringLabelTexture(`GATE ${String(i + 1).padStart(2, '0')}`);
     const label = new THREE.Mesh(
-      new THREE.PlaneGeometry(34, 8.5),
+      new THREE.PlaneGeometry(40, 10),
       new THREE.MeshBasicMaterial({ map: labelTex, transparent: true, side: THREE.DoubleSide, depthWrite: false }),
     );
-    label.position.y = RING_RADIUS + 12;
+    label.position.y = RING_RADIUS + 14;
     ring.add(label);
     ring.position.set(x, y, z);
     // Rings stand upright across the course: face the incoming plane (south).
@@ -88,7 +88,7 @@ export function buildRings() {
       guide.computeLineDistances();
       guide.visible = true;
       // Face the next ring's label at the plane so it always reads.
-      nextRing.label.lookAt(planePos.x, nextRing.centre.y + RING_RADIUS + 12, planePos.z);
+      nextRing.label.lookAt(planePos.x, nextRing.centre.y + RING_RADIUS + 14, planePos.z);
     } else {
       guide.visible = false;
     }

@@ -10,7 +10,7 @@ import { createWorld } from './world.js';
 import { autopilotInput } from './autopilot.js';
 import { groundHeightAt } from './terrain.js';
 
-export const SHOT_IDS = ['leg1', 'leg2', 'leg3', 'landing', 'menu', 'results'];
+export const SHOT_IDS = ['leg1', 'leg2', 'leg3', 'landing', 'menu', 'results', 'cockpit', 'afterburner'];
 
 /**
  * The score a real sortie would have at this moment, replayed from the award
@@ -45,7 +45,10 @@ export function stageShot(shotId) {
   }
   // 'results' stages exactly like the landing shot: on final approach, and
   // runStaging flies it to touchdown — main.js then shows the results panel.
-  const leg = shotId === 'leg1' ? 0 : shotId === 'leg2' ? 1 : 2;
+  // 'cockpit' and 'afterburner' stage like leg 1 (one ring in, afterburner
+  // lit); the cockpit shot flies from inside the canopy (main.js), the
+  // afterburner shot uses the burner cam (state.camMode).
+  const leg = (shotId === 'leg1' || shotId === 'cockpit' || shotId === 'afterburner') ? 0 : shotId === 'leg2' ? 1 : 2;
   const cleared = (shotId === 'landing' || shotId === 'results') ? 12 : leg * 4 + 1;
   s.leg = (shotId === 'landing' || shotId === 'results') ? 2 : leg;
   s.ringsCleared = cleared;
@@ -53,7 +56,7 @@ export function stageShot(shotId) {
   s.crosswind = LEGS[s.leg].crosswind;
   // Leg 3 is staged late (elapsed 232 s) so the tank is genuinely low by the
   // drain rule below — the LOW FUEL banner in that shot is earned, not posed.
-  s.elapsed = [26, 96, 232, 262][shotId === 'leg1' ? 0 : shotId === 'leg2' ? 1 : shotId === 'leg3' ? 2 : 3];
+  s.elapsed = [26, 96, 232, 262][(shotId === 'leg1' || shotId === 'cockpit' || shotId === 'afterburner') ? 0 : shotId === 'leg2' ? 1 : shotId === 'leg3' ? 2 : 3];
   s.score = stagedScore(cleared, s.elapsed);
   // Fuel from the real drain: 0.40 %/s at cruise throttle 0.7 (world.js drains
   // 0.12 + 0.40 * throttle), plus 2% topped up at each gate cleared.
@@ -85,12 +88,15 @@ export function stageShot(shotId) {
   s.roll = 0;
 
   // Per-shot callout, as the real game would show it.
-  if (shotId === 'leg1') {
+  if (shotId === 'leg1' || shotId === 'cockpit' || shotId === 'afterburner') {
     // The gameplay showcase shot: afterburner lit for the whole staging
     // flight (autopilot never sends the field, so stepWorld keeps it on).
     s.afterburner = true;
     s.callout = 'GATE 02 — THREAD THE GOLDEN RING!';
     s.calloutUntil = s.elapsed + 30;
+    // The afterburner shot pulls the chase cam back and down (burner cam)
+    // so the twin flame tongues stay in frame.
+    if (shotId === 'afterburner') s.camMode = 'burner';
   } else if (shotId === 'leg2') {
     s.callout = 'CROSSWIND 8 KT · HOLD YOUR LINE';
     s.calloutUntil = s.elapsed + 30;
@@ -134,6 +140,15 @@ export function stageShot(shotId) {
     s.callout = 'AIRMAIL +500 — DEAD CENTRE!';
     s.calloutUntil = s.elapsed + 30;
     s.calloutDanger = false;
+  }
+  if (shotId === 'results') {
+    // The results shot stages a COMPLETED sortie: all four airmail drops
+    // dead centre (+500 each). The old staging left AIRMAIL 0 / 4 on the
+    // results panel — a failed sub-objective as the showcase frame.
+    for (const d of s.drops) { d.done = true; d.bonus = 500; }
+    s.dropsDone = 4;
+    s.dropBonusTotal = 2000;
+    s.score += 2000;
   }
   return s;
 }

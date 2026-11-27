@@ -39,7 +39,7 @@ export const LEGS = [
 ];
 
 export const RING_COUNT = 12;
-export const RING_RADIUS = 20;
+export const RING_RADIUS = 24; // pass when within 92% (22.1 m) of the centre
 // Ring award: 1000 + 100 * (leg + 1) + time bonus (world.js); a gate also
 // tops the tank up by FUEL_RING_BONUS. No leg-completion bonus is awarded.
 export const FUEL_RING_BONUS = 2; // % topped up at each gate station

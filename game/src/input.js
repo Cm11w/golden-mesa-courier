@@ -1,8 +1,8 @@
 // Golden Mesa Courier — keyboard + mouse input.
 // One job: turn keys and the mouse into flight controls and camera looks.
 // W/S throttle, arrows pitch and roll, SPACE airmail drop, R restart,
-// G gear, ENTER/click to start from the title screen (and to fly again),
-// drag to look.
+// G gear, C cockpit/chase view, ENTER/click to start from the title screen
+// (and to fly again), drag to look.
 
 export function createInput(canvas) {
   const keys = new Set();
@@ -47,6 +47,7 @@ export function createInput(canvas) {
       const roll = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0);
       const restart = keys.has('KeyR');
       const gear = keys.has('KeyG');
+      const cockpit = keys.has('KeyC');
       // Afterburner: hold either Shift (or B) — live, not edge-triggered.
       const afterburner = keys.has('ShiftLeft') || keys.has('ShiftRight') || keys.has('KeyB');
       // Edge-triggered actions: consumed once per press, never held.
@@ -54,10 +55,11 @@ export function createInput(canvas) {
       const start = keys.has('Enter') || clicked;
       if (restart) keys.delete('KeyR');
       if (gear) keys.delete('KeyG');
+      if (cockpit) keys.delete('KeyC');
       if (drop) keys.delete('Space');
       if (keys.has('Enter')) keys.delete('Enter');
       clicked = false;
-      return { pitch, roll, throttle: next, restart, gear, drop, start, afterburner };
+      return { pitch, roll, throttle: next, restart, gear, cockpit, drop, start, afterburner };
     },
     /** Mouse look offset in radians; decays back to centre when released. */
     look() {
