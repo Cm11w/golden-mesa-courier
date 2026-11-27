@@ -2,7 +2,6 @@
 // One job: copy game/ and screenshots/ into /output and write the dossier
 // there, so the scorer can verify the game from the dossier alone.
 // Deterministic: the same entry directory writes the same /output bytes.
-// Round 2: title screen, airmail drops, richer end screen, gentler leg 1.
 
 import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

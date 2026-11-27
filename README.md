@@ -4,10 +4,10 @@
 [![make.fun](https://make.fun/badge/best-flight-game-20261126-0057/Cm11w/golden-mesa-courier/rank.svg)](https://make.fun/c/best-flight-game-20261126-0057)
 [![make.fun](https://make.fun/badge/best-flight-game-20261126-0057/Cm11w/golden-mesa-courier/reward.svg)](https://make.fun/c/best-flight-game-20261126-0057)
 
-A golden-hour mail run through a desert canyon. Fly propeller courier
-**N427GM — GOLDEN MESA** through twelve glowing gates across three named
-legs, drop the mail on the painted ground targets, fight the crosswind,
-watch the fuel, and land her gently on the home strip for a grade.
+A golden-hour mail run through a desert canyon. Fly jet **N427GM —
+GOLDEN MESA** through twelve glowing gates across three named legs, drop
+the mail on the painted ground targets, fight the crosswind, watch the
+fuel and the hull, and land her gently on the home strip for a grade.
 
 **Bounty:** [Make the best flight game — make.fun](https://make.fun/c/best-flight-game-20261126-0057)
 
@@ -21,6 +21,7 @@ vendored under `game/vendor/`). The title screen comes up first — press
 - **← →** — roll (bank to turn)
 - **↑ ↓** — pitch
 - **SPACE** — airmail drop: release the mail over a painted ground target
+- **SHIFT** — afterburner: +35% speed at 3× fuel burn (flames grow, A/B lights up)
 - **Drag mouse** — look around
 - **G** — gear up / down · **R** — fly again after landing or a crash
 - **ENTER / click** — fly again from the results screen
@@ -46,35 +47,43 @@ Post, Mesa Post) — press SPACE over one to release a parcel. Dead centre
 **+150**; a parcel lost in the sand pays nothing. Clear all twelve gates
 and land on the runway: **PERFECT**, **GOOD** or **HARD**, by how gently
 and how centred you touch down — plus a landing bonus and your personal
-best on the results screen. Hit the terrain or run dry and the canyon
-keeps the mail.
+best on the results screen. **Hull:** a ground strike costs 25 hull and
+a hard landing 15–30; at 0 hull the jet is lost (**HULL BREACH**). Hit the
+terrain four times, or run dry, and the canyon keeps the mail.
 
 ## What you see
 
-- A detailed propeller courier: tapered fuselage with red cheatline and
-  "GOLDEN MESA / N427GM" livery, glass canopy, spinning propeller with
-  blur disc, cargo pod, landing gear, red/green navigation lights.
+- Three jets to pick, all with twin afterburners: **INTERCEPTOR** (big
+  delta wing, canards, fastest), **STRIKE** (swept wing, balanced),
+  **HAULER** (wide wing, twin fins, cargo pod) — each in six liveries
+  plus a custom colour. Slim pointed fuselage with red cheatline and
+  "GOLDEN MESA / N427GM" livery, glass canopy, landing gear, red/green
+  navigation lights, orange afterburner flames that grow on SHIFT.
 - A golden-hour canyon: layered mesas, a wide turquoise river with sandy
   banks, saguaro cacti, cottonwoods, rocks, distant peaks, clouds and a
-  low sun that rides ahead of the plane in every shot.
+  low sun that rides ahead of the plane in every shot. Leg 2 brings low
+  mist over the river, leg 3 a lower, redder sun; a hot-air balloon and a
+  fire-watch tower stand far off the course.
 - A home strip with painted markings, edge lights, a windsock and a tower.
 - A full panel: altitude, speed and heading, score, rings, airmail drops,
   time and cargo up top; airspeed, attitude and altimeter dials, throttle
-  and fuel below, all on one dashboard strip. The leg panel carries the
-  ship's callsign — `LEG 2 / 3 · N427GM`.
+  and fuel below. New in round 4: a **HULL** bar (green/amber/red), an
+  **objective panel** (next gate + distance in NM), a live **radar
+  mini-map** (jet, next gate, next drop, runway), a bottom **data bar**
+  (SPD · ALT · AGL · V/S · G-load · throttle + A/B), and an afterburner
+  badge on the throttle.
 - Synthesised engine hum, wind, ring chimes, warnings and a landing
-  fanfare — no audio files.
+  fanfare — no audio files. The engine roar rises on afterburner.
 
 ## Screenshots
 
 Four staged shots, each a repeatable render of the real rules being
-played with a fixed seed (`game/index.html?shot=title|leg2|leg3|landing&seed=1`):
+played with a fixed seed (`game/index.html?shot=menu|leg1|leg2|results&seed=1`):
 
-1. Title screen — GOLDEN MESA · N427GM, premise and controls, ENTER to fly
-2. Leg 2 along the river, airmail parcel dead centre on River Post (+500)
-3. Leg 3 through the mesa gates, fuel low
-4. Landing on the runway with the results screen — big final score, gates /
-   time left / landing grade, landing bonus, personal best, 12/12 gates
+1. Main menu — pick your jet (INTERCEPTOR / STRIKE / HAULER) and livery
+2. Leg 1 canyon run, afterburner lit, radar + new HUD live
+3. Leg 2 along the river, airmail parcel dead centre on River Post (+500)
+4. Results — PERFECT landing, 12/12 gates, final score
 
 ## Build
 
