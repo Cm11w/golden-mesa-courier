@@ -3,7 +3,7 @@
 // landing and game over — as pure numbers. Rendering lives elsewhere.
 
 import * as THREE from 'three';
-import { CALLSIGN, DROP_COUNT, DROP_RADIUS, DROP_SPOTS, FUEL_RING_BONUS, LEGS, LOW_FUEL_AT, RING_COUNT, RING_RADIUS, RING_SPOTS, WORLD, ringRadiusFor } from './config.js';
+import { CALLSIGN, DROP_RADIUS, DROP_SPOTS, FUEL_RING_BONUS, LEGS, LOW_FUEL_AT, RING_COUNT, RING_RADIUS, RING_SPOTS, WORLD } from './config.js';
 import { groundHeightAt } from './terrain.js';
 
 export const MAX_SPEED = 88; // m/s, about 171 kt
@@ -15,25 +15,22 @@ const MAX_PITCH = 0.5;
 
 export function createWorld() {
   return {
-    phase: 'title', // title | fly | landed | over — the sortie starts on the title screen
+    phase: 'fly', // fly | landed | over
     leg: 0,
     ringsCleared: 0,
     score: 0,
     cargoKg: LEGS[0].cargoKg,
-    fuel: 100,
-    airframe: 100,
-    elapsed: 0,
-    timeLimit: WORLD.timeLimit,
     drops: DROP_SPOTS.flatMap((legSpots, leg) => legSpots.map(([x, z, label]) => ({
       x, z, leg, label, done: false, missed: false, bonus: 0, y: 0,
     }))),
     dropsDone: 0,
     dropBonusTotal: 0,
     packages: [], // falling mail parcels: { x, y, z, vy, landed }
-    landingBonus: 0,
-    landingTimeBonus: 0,
-    personalBest: 0, // filled from localStorage by the HUD; staged shots set it
     callsign: CALLSIGN,
+    fuel: 100,
+    airframe: 100,
+    elapsed: 0,
+    timeLimit: WORLD.timeLimit,
     pos: new THREE.Vector3(WORLD.start.x, WORLD.start.y, WORLD.start.z),
     heading: WORLD.startHeading, // radians; π = north, down the course (-z)
     pitch: 0,
@@ -127,13 +124,9 @@ export function stepWorld(s, input, dt) {
   }
 
   // --- Terrain ---
-  // Leg 1 is forgiving: the plane may skim 1.5 m lower before the canyon
-  // claims it, so a judge still learning the controls survives the first
-  // half-minute. Legs 2–3 keep the strict clearance.
-  const clearance = s.leg === 0 ? 1.0 : 2.5;
   const ground = groundHeightAt(s.pos.x, s.pos.z);
-  if (s.pos.y <= ground + clearance) {
-    s.pos.y = ground + clearance;
+  if (s.pos.y <= ground + 2.5) {
+    s.pos.y = ground + 2.5;
     s.phase = 'over';
     s.overReason = 'TERRAIN STRIKE — THE CANYON WINS THIS TIME';
     s.airframe = 12;
@@ -149,7 +142,7 @@ export function stepWorld(s, input, dt) {
     const dx = s.pos.x - next[0];
     const dy = s.pos.y - next[1];
     const dz = s.pos.z - next[2];
-    if (Math.sqrt(dx * dx + dy * dy + dz * dz) < ringRadiusFor(s.ringsCleared) * 0.92) {
+    if (Math.sqrt(dx * dx + dy * dy + dz * dz) < RING_RADIUS * 0.92) {
       const award = 1000 + 100 * (s.leg + 1) + Math.round((s.timeLimit - s.elapsed) / 10) * 10;
       s.score += award;
       s.ringsCleared += 1;
@@ -202,10 +195,8 @@ export function stepWorld(s, input, dt) {
       const vsFpm = Math.abs(s.verticalSpeed) * 196.85;
       s.landingGrade = centreOffset < 8 && vsFpm < 180 ? 'PERFECT'
         : centreOffset < 16 && vsFpm < 320 ? 'GOOD' : 'HARD';
-      const gradeBonus = s.landingGrade === 'PERFECT' ? 500 : s.landingGrade === 'GOOD' ? 250 : 100;
-      s.landingTimeBonus = Math.round((s.timeLimit - s.elapsed) / 10) * 10;
-      s.landingBonus = gradeBonus + s.landingTimeBonus;
-      s.score += s.landingBonus;
+      s.score += s.landingGrade === 'PERFECT' ? 500 : s.landingGrade === 'GOOD' ? 250 : 100;
+      s.score += Math.round((s.timeLimit - s.elapsed) / 10) * 10;
       events.push('landed');
     }
   }
@@ -249,13 +240,11 @@ export function dropPackage(s) {
 /** HUD-friendly numbers derived from the state. */
 export function hudState(s) {
   const ground = groundHeightAt(s.pos.x, s.pos.z);
-  const parked = s.phase === 'title';
   return {
     ...s,
     altitudeFt: Math.max(0, (s.pos.y - ground) * 3.28084),
-    // On the title screen she is parked on the start line, not doing 89 kt.
-    speedKt: parked ? 0 : s.speed * 1.94384,
+    speedKt: s.speed * 1.94384,
     headingDeg: ((s.heading * 180) / Math.PI + 360) % 360,
-    verticalSpeedFpm: parked ? 0 : s.verticalSpeed * 196.85,
+    verticalSpeedFpm: s.verticalSpeed * 196.85,
   };
 }

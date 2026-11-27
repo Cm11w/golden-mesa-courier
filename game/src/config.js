@@ -40,11 +40,10 @@ export const LEGS = [
 
 export const RING_COUNT = 12;
 export const RING_RADIUS = 20;
-// The first two gates are wider (26 m) so the opening half-minute forgives
-// a judge who is still learning the controls.
-export function ringRadiusFor(index) {
-  return index < 2 ? 26 : RING_RADIUS;
-}
+// Ring award: 1000 + 100 * (leg + 1) + time bonus (world.js); a gate also
+// tops the tank up by FUEL_RING_BONUS. No leg-completion bonus is awarded.
+export const FUEL_RING_BONUS = 2; // % topped up at each gate station
+export const LOW_FUEL_AT = 25; // % — LOW FUEL banner
 // Aircraft identity, carried on the livery and lifted into the HUD/title.
 export const CALLSIGN = 'N427GM';
 export const SHIP_NAME = 'GOLDEN MESA';
@@ -57,10 +56,6 @@ export const DROP_SPOTS = [
 ];
 export const DROP_RADIUS = 25; // m — the painted target circle
 export const DROP_COUNT = 4;
-// Ring award: 1000 + 100 * (leg + 1) + time bonus (world.js); a gate also
-// tops the tank up by FUEL_RING_BONUS. No leg-completion bonus is awarded.
-export const FUEL_RING_BONUS = 2; // % topped up at each gate station
-export const LOW_FUEL_AT = 25; // % — LOW FUEL banner
 
 export const PALETTE = {
   skyTop: '#4a2a68',

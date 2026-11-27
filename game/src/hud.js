@@ -88,7 +88,7 @@ export function drawHud(ctx, s, w, h) {
   ctx.fillText('GOLDEN MESA', 28, 36);
   ctx.font = '11px Georgia, serif';
   ctx.fillStyle = 'rgba(245, 233, 200, 0.75)';
-  ctx.fillText('C O U R I E R', 28, 54);
+  ctx.fillText(`C O U R I E R · ${s.callsign || 'N427GM'}`, 28, 54);
   const stats = [
     ['ALT', `${Math.round(s.altitudeFt)}`, 'FT'],
     ['SPD', `${Math.round(s.speedKt)}`, 'KT'],
@@ -278,33 +278,10 @@ export function drawHud(ctx, s, w, h) {
     ctx.fillStyle = 'rgba(245, 233, 200, 0.85)';
     ctx.font = '14px Georgia, serif';
     ctx.textAlign = 'center';
-    ctx.fillText('W / S throttle · ← → roll · ↑ ↓ pitch · drag mouse to look', w / 2, h - 148);
+    ctx.fillText('W / S throttle · ← → roll · ↑ ↓ pitch · SPACE drop mail · drag mouse to look', w / 2, h - 148);
   }
 
-  // ---- End screens ----
-  if (s.phase === 'landed' || s.phase === 'over') {
-    ctx.fillStyle = 'rgba(8, 26, 32, 0.62)';
-    ctx.fillRect(0, 0, w, h);
-    const title = s.phase === 'landed' ? 'A GOLDEN TOUCHDOWN' : 'SORTIE OVER';
-    const lines = s.phase === 'landed'
-      ? [
-          `LANDING GRADE  ${s.landingGrade}`,
-          `GATES  ${s.ringsCleared} / ${RING_COUNT}`,
-          `CARGO DELIVERED  ${s.cargoKg} KG`,
-          `SCORE  ${String(s.score).padStart(6, '0')}`,
-        ]
-      : [
-          `GATES  ${s.ringsCleared} / ${RING_COUNT}`,
-          `SCORE  ${String(s.score).padStart(6, '0')}`,
-          s.overReason,
-          'PRESS R TO FLY AGAIN',
-        ];
-    ctx.textAlign = 'center';
-    ctx.fillStyle = GOLD;
-    ctx.font = 'bold 44px Georgia, serif';
-    ctx.fillText(title, w / 2, h / 2 - 84);
-    ctx.fillStyle = CREAM;
-    ctx.font = '24px Georgia, serif';
-    lines.forEach((line, i) => ctx.fillText(line, w / 2, h / 2 - 28 + i * 38));
-  }
+  // NOTE: no canvas end screen here. When a sortie ends the DOM results
+  // panel (menu.js) carries the grade, score and the FLY AGAIN / MAIN MENU
+  // buttons — the canvas only ever draws the instruments.
 }
