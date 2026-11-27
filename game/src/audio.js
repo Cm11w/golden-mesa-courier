@@ -78,14 +78,16 @@ export function buildAudio() {
       if (ensure() && ctx.state === 'suspended') ctx.resume();
       return started;
     },
-    /** Continuous engine + wind, driven by throttle and speed each frame. */
-    update(throttle, speed01) {
+    /** Continuous engine + wind, driven by throttle and speed each frame.
+     *  `afterburner` (optional) raises the engine roar and the wind rush. */
+    update(throttle, speed01, afterburner = false) {
       if (!ctx || !started) return;
       const t = ctx.currentTime;
-      engineOsc.frequency.setTargetAtTime(46 + throttle * 64, t, 0.1);
-      engineOsc2.frequency.setTargetAtTime(69 + throttle * 96, t, 0.1);
-      engineGain.gain.setTargetAtTime(0.05 + throttle * 0.075, t, 0.1);
-      windGain.gain.setTargetAtTime(speed01 * 0.05, t, 0.2);
+      const boost = afterburner ? 1.5 : 1;
+      engineOsc.frequency.setTargetAtTime((46 + throttle * 64) * boost, t, 0.1);
+      engineOsc2.frequency.setTargetAtTime((69 + throttle * 96) * boost, t, 0.1);
+      engineGain.gain.setTargetAtTime(0.05 + throttle * 0.075 + (afterburner ? 0.03 : 0), t, 0.1);
+      windGain.gain.setTargetAtTime(speed01 * 0.05 * (afterburner ? 1.6 : 1), t, 0.2);
     },
     ring() {
       if (!ctx) return;

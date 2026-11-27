@@ -396,6 +396,97 @@ function buildDressing(noise, rng) {
   return group;
 }
 
+function buildLowClouds(rng) {
+  // Low mist hugging the river canyon (leg 2 weather): flat wide puffs
+  // riding just above the canyon floor along the river spline. Hidden
+  // outside leg 2 by main.js — the geometry and heights never change.
+  const group = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({
+    color: '#f2d9c8', roughness: 1, metalness: 0,
+    transparent: true, opacity: 0.75, emissive: '#e8a878', emissiveIntensity: 0.2,
+  });
+  const puff = new THREE.IcosahedronGeometry(1, 1);
+  for (let i = 0; i < 14; i += 1) {
+    const t = i / 13;
+    const idx = Math.min(RIVER_PATH.length - 2, Math.floor(t * (RIVER_PATH.length - 1)));
+    const [ax, az] = RIVER_PATH[idx];
+    const [bx, bz] = RIVER_PATH[idx + 1];
+    const f = t * (RIVER_PATH.length - 1) - idx;
+    const x = ax + (bx - ax) * f + (rng() - 0.5) * 120;
+    const z = az + (bz - az) * f + (rng() - 0.5) * 120;
+    const cloud = new THREE.Group();
+    const count = 3 + Math.floor(rng() * 3);
+    for (let j = 0; j < count; j += 1) {
+      const s = 30 + rng() * 45;
+      const m = new THREE.Mesh(puff, mat);
+      m.position.set((j - count / 2) * s * 0.9, (rng() - 0.5) * 8, (rng() - 0.5) * 20);
+      m.scale.set(s, s * 0.22, s * 0.6);
+      cloud.add(m);
+    }
+    cloud.position.set(x, groundHeightAt(x, z) + 55 + rng() * 30, z);
+    group.add(cloud);
+  }
+  group.visible = false;
+  return group;
+}
+
+function buildBalloon() {
+  // A hot-air balloon drifting far east of the course — a fixed landmark
+  // for the mesa leg, well clear of every ring and the runway.
+  const group = new THREE.Group();
+  const envelope = new THREE.Mesh(
+    new THREE.SphereGeometry(14, 20, 14),
+    new THREE.MeshStandardMaterial({ color: '#c22e2e', roughness: 0.8, emissive: '#7a1a1a', emissiveIntensity: 0.3 }),
+  );
+  envelope.scale.y = 1.15;
+  envelope.position.y = 26;
+  const band = new THREE.Mesh(
+    new THREE.TorusGeometry(13.2, 1.2, 8, 24),
+    new THREE.MeshStandardMaterial({ color: '#ffc23d', roughness: 0.8 }),
+  );
+  band.rotation.x = Math.PI / 2;
+  band.position.y = 26;
+  const basket = new THREE.Mesh(
+    new THREE.BoxGeometry(6, 5, 6),
+    new THREE.MeshStandardMaterial({ color: '#6b4a33', roughness: 1 }),
+  );
+  basket.position.y = 6;
+  group.add(envelope, band, basket);
+  group.position.set(620, 260, -2100);
+  return group;
+}
+
+function buildTower() {
+  // A distant fire-watch tower on a mesa rim, west of the course — a
+  // silhouette for the canyon leg, never near the flight line.
+  const group = new THREE.Group();
+  const legMat = new THREE.MeshStandardMaterial({ color: '#4a3428', roughness: 1 });
+  for (const [lx, lz] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 46, 6), legMat);
+    leg.position.set(lx, 23, lz);
+    group.add(leg);
+  }
+  const cabin = new THREE.Mesh(
+    new THREE.BoxGeometry(12, 8, 12),
+    new THREE.MeshStandardMaterial({ color: '#8a6a52', roughness: 1 }),
+  );
+  cabin.position.y = 50;
+  const roof = new THREE.Mesh(
+    new THREE.ConeGeometry(10, 6, 4),
+    new THREE.MeshStandardMaterial({ color: '#c22e2e', roughness: 0.9 }),
+  );
+  roof.position.y = 57;
+  roof.rotation.y = Math.PI / 4;
+  const beacon = new THREE.Mesh(
+    new THREE.SphereGeometry(1.2, 8, 6),
+    new THREE.MeshStandardMaterial({ color: '#ff2e2e', emissive: '#ff2e2e', emissiveIntensity: 2 }),
+  );
+  beacon.position.y = 61;
+  group.add(cabin, roof, beacon);
+  group.position.set(-640, groundHeightAt(-640, -1200), -1200);
+  return group;
+}
+
 /** Build the whole static world: sky, sun, ground, river, peaks, clouds, dressing. */
 export function buildTerrain(seed = WORLD.seed) {
   const rng = makeRng(seed);
@@ -409,6 +500,10 @@ export function buildTerrain(seed = WORLD.seed) {
   group.add(buildPeaks());
   const clouds = buildClouds(rng);
   group.add(clouds);
+  const lowClouds = buildLowClouds(rng);
+  group.add(lowClouds);
+  group.add(buildBalloon());
+  group.add(buildTower());
   group.add(buildDressing(noise, rng));
-  return { group, clouds, sun, groundHeightAt: (x, z) => groundHeightAt(x, z, noise) };
+  return { group, clouds, lowClouds, sun, groundHeightAt: (x, z) => groundHeightAt(x, z, noise) };
 }

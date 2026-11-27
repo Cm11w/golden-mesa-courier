@@ -133,8 +133,40 @@ function placeAircraft() {
   g.rotation.z = state.roll;
   // The gear shows only when it is down (the HUD says GEAR UP in flight).
   aircraft.gear.visible = state.gearDown;
-  aircraft.propeller.rotation.z += 0.5;
-  aircraft.propeller.rotation.z %= Math.PI * 2;
+  // Afterburner flames: short idle flicker, long bright tongues on SHIFT.
+  // Scale the meshes, never the group (a group scale would shove the
+  // flames toward the chase camera, where they project below the frame).
+  // Cone length is the mesh's local Y (rotated to -Z); width is local X/Z.
+  const ab = !!state.afterburner;
+  const flick = 1 + 0.14 * Math.sin(frame * 0.9) + 0.06 * Math.sin(frame * 2.3);
+  const abLen = (ab ? 1.6 : 0.7) * flick;
+  const abWid = (ab ? 1.25 : 0.75) * flick;
+  for (const c of aircraft.afterburner.userData.cones) c.scale.set(abWid, abLen, abWid);
+  for (const g of aircraft.afterburner.userData.glows) g.scale.set(abWid, abWid, 1);
+}
+
+// Per-leg atmosphere: leg 1 golden-hour canyon, leg 2 low mist over the
+// river, leg 3 a lower, redder sun over the mesas. Fog colour + density and
+// the sun ease toward the leg's target each frame — the rings, drops and
+// ground heights never move, only the light does.
+const LEG_ATMOS = [
+  { fog: new THREE.Color(PALETTE.fog), near: 600, far: 4200, sun: 2.4, hemi: 0.9 },
+  { fog: new THREE.Color('#b98a7a'), near: 420, far: 3400, sun: 2.2, hemi: 0.85 },
+  { fog: new THREE.Color('#d96a4a'), near: 600, far: 4200, sun: 1.9, hemi: 0.8 },
+];
+const _fogTarget = new THREE.Color();
+function applyLegAtmosphere(dt) {
+  const a = LEG_ATMOS[state.leg] || LEG_ATMOS[0];
+  _fogTarget.copy(a.fog);
+  scene.fog.color.lerp(_fogTarget, Math.min(1, dt * 0.5));
+  scene.fog.near += (a.near - scene.fog.near) * Math.min(1, dt * 0.5);
+  scene.fog.far += (a.far - scene.fog.far) * Math.min(1, dt * 0.5);
+  sun.intensity += (a.sun - sun.intensity) * Math.min(1, dt * 0.5);
+  hemi.intensity += (a.hemi - hemi.intensity) * Math.min(1, dt * 0.5);
+  // Low mist over the river (leg 2) and the dusk balloon ride on the
+  // atmosphere: mist only in leg 2, balloon always in the distance.
+  terrain.lowClouds.visible = state.leg === 1;
+  terrain.lowClouds.position.x = state.pos.x * 0.3;
 }
 
 function resetCamera() {
@@ -276,6 +308,8 @@ window.__gmc = {
   score: () => state.score,
   grade: () => state.landingGrade,
   rings: () => state.ringsCleared,
+  hull: () => state.hull,
+  afterburner: () => !!state.afterburner,
   selection: () => ({ ...selection }),
   pos: () => [state.pos.x, state.pos.y, state.pos.z],
   start: () => menuElStart(),
@@ -330,6 +364,9 @@ if (shotMode) {
   } else {
     const events = runStaging(state, stepWorld);
     handleEvents(events);
+    applyLegAtmosphere(1);
+    applyLegAtmosphere(1);
+    applyLegAtmosphere(1);
     updateCamera(1);
     renderFrame();
     updateCamera(1);
@@ -387,7 +424,8 @@ if (shotMode) {
       screen = 'results';
     }
     if (input.interacted) audio.unlock();
-    audio.update(state.throttle, state.speed / 88);
+    audio.update(state.throttle, state.speed / 100, !!state.afterburner);
+    applyLegAtmosphere(dt);
     updateCamera(dt);
     renderFrame();
     window.__gameReady = true;

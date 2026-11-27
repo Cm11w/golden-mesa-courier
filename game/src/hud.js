@@ -3,7 +3,7 @@
 // compass, bottom dials, fuel, throttle, and the big in-scene callouts.
 // The dials are drawn with ticks, numbers and needles — never blank squares.
 
-import { FUEL_RING_BONUS, LEGS, LOW_FUEL_AT, RING_COUNT } from './config.js';
+import { FUEL_RING_BONUS, LEGS, LOW_FUEL_AT, RING_COUNT, WORLD } from './config.js';
 
 const CREAM = '#f5e9c8';
 const GOLD = '#ffc23d';
@@ -115,22 +115,33 @@ export function drawHud(ctx, s, w, h) {
     sx += 132;
   }
 
-  // ---- Leg panel (left, under the bar) ----
-  panel(ctx, 12, 78, 218, 74, 10);
+  // ---- Objective panel (left, under the bar): the mission at a glance ----
+  // Row 1: objective — next gate + distance in nautical miles.
+  // Row 2: leg name. Row 3: ring progress dots. Nothing the old leg panel
+  // showed is lost; the objective line is added on top.
+  panel(ctx, 12, 78, 218, 96, 10);
   ctx.textAlign = 'left';
+  ctx.font = 'bold 12px Georgia, serif';
+  ctx.fillStyle = GOLD;
+  ctx.fillText(
+    s.ringsCleared < RING_COUNT
+      ? `OBJ: GATE ${String(s.ringsCleared + 1).padStart(2, '0')}/${RING_COUNT} · ${s.nextRingNm.toFixed(1)} NM`
+      : 'OBJ: LAND ON THE STRIP',
+    26, 98,
+  );
   ctx.font = '11px Georgia, serif';
   ctx.fillStyle = 'rgba(245, 233, 200, 0.75)';
-  ctx.fillText(leg.tag, 26, 100);
+  ctx.fillText(leg.tag, 26, 116);
   ctx.font = 'bold 20px Georgia, serif';
   ctx.fillStyle = GOLD;
-  ctx.fillText(leg.name, 26, 126);
+  ctx.fillText(leg.name, 26, 140);
   ctx.font = '12px Georgia, serif';
   ctx.fillStyle = CREAM;
-  ctx.fillText(`RING ${Math.min(s.ringsCleared + 1, RING_COUNT)} / ${RING_COUNT}`, 26, 144);
+  ctx.fillText(`RING ${Math.min(s.ringsCleared + 1, RING_COUNT)} / ${RING_COUNT}`, 26, 160);
   for (let i = 0; i < RING_COUNT; i += 1) {
     ctx.fillStyle = i < s.ringsCleared ? GREEN : 'rgba(245, 233, 200, 0.35)';
     ctx.beginPath();
-    ctx.arc(150 + i * 7, 140, 3, 0, Math.PI * 2);
+    ctx.arc(150 + i * 7, 156, 3, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -160,18 +171,27 @@ export function drawHud(ctx, s, w, h) {
   ctx.lineTo(w / 2, 88);
   ctx.fill();
 
-  // ---- Airframe / wind panel (right) ----
-  panel(ctx, w - 230, 78, 218, 74, 10);
+  // ---- Airframe / hull / wind panel (right) ----
+  panel(ctx, w - 230, 78, 218, 96, 10);
   ctx.textAlign = 'left';
   ctx.font = '12px Georgia, serif';
   ctx.fillStyle = CREAM;
-  ctx.fillText(`AIRFRAME   ${s.airframe}%`, w - 216, 104);
+  ctx.fillText(`AIRFRAME   ${s.airframe}%`, w - 216, 100);
+  // HULL: explicit structural damage. Green > 50, amber 25–50, red < 25.
+  const hull = s.hull ?? 100;
+  const hullColor = hull > 50 ? GREEN : hull >= 25 ? GOLD : RED;
+  ctx.fillStyle = hullColor;
+  ctx.fillText(`HULL   ${hull}%`, w - 216, 120);
+  ctx.fillStyle = '#123a44';
+  ctx.fillRect(w - 130, 111, 104, 9);
+  ctx.fillStyle = hullColor;
+  ctx.fillRect(w - 130, 111, 104 * (hull / 100), 9);
   ctx.fillStyle = s.crosswind > 0 ? GOLD : CREAM;
   // Crosswind is stored in m/s; the HUD reports knots (1 m/s = 1.944 kt):
   // leg 2 shows 8 kt, leg 3 shows 16 kt — the same numbers the banners use.
-  ctx.fillText(s.crosswind > 0 ? `WIND  ${Math.round(s.crosswind * 1.94384)} KT XWIND` : 'WIND  CALM', w - 216, 130);
+  ctx.fillText(s.crosswind > 0 ? `WIND  ${Math.round(s.crosswind * 1.94384)} KT XWIND` : 'WIND  CALM', w - 216, 142);
   ctx.fillStyle = 'rgba(245, 233, 200, 0.7)';
-  ctx.fillText(s.phase === 'landed' ? 'ON THE GROUND' : `GEAR ${s.gearDown ? 'DOWN' : 'UP'}`, w - 216, 146);
+  ctx.fillText(s.phase === 'landed' ? 'ON THE GROUND' : `GEAR ${s.gearDown ? 'DOWN' : 'UP'}`, w - 216, 162);
 
   // ---- Left instrument column (dials) + bottom corners (throttle/fuel) ----
   // Floating panels only — NO full-width strip. The r2 strip ran to the
@@ -186,6 +206,12 @@ export function drawHud(ctx, s, w, h) {
   ctx.font = 'bold 11px Georgia, serif';
   ctx.fillStyle = CREAM;
   ctx.fillText('THROTTLE', 26, by + 12);
+  // Afterburner badge: lit gold-orange while SHIFT is held, dim otherwise.
+  ctx.font = 'bold 13px Georgia, serif';
+  ctx.fillStyle = s.afterburner ? '#ff7a1a' : 'rgba(245, 233, 200, 0.35)';
+  ctx.textAlign = 'right';
+  ctx.fillText('A/B', 148, by + 13);
+  ctx.textAlign = 'left';
   ctx.fillStyle = '#123a44';
   ctx.fillRect(26, by + 24, 122, 14);
   ctx.fillStyle = GOLD;
@@ -195,6 +221,80 @@ export function drawHud(ctx, s, w, h) {
   ctx.font = '11px Georgia, serif';
   ctx.fillStyle = 'rgba(245, 233, 200, 0.7)';
   ctx.fillText('W / S', 26, by + 82);
+
+  // ---- Mini-map / radar (right, above the fuel panel) ----
+  // Plane-centred, north-up, 1.2 km radius: the jet sits in the middle as a
+  // small arrow on its heading, the next gate is gold, the next drop target
+  // green, the runway a white tick at the top. Blips clamp to the rim.
+  {
+    const rcx = w - 115;
+    const rcy = h - 250;
+    const rr = 55;
+    const range = 1200; // m to the rim
+    const k = rr / range;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(rcx, rcy, rr, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(10, 38, 46, 0.92)';
+    ctx.fill();
+    ctx.strokeStyle = LINE;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(rcx, rcy, rr / 2, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(63, 125, 140, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(rcx, rcy, rr, 0, Math.PI * 2);
+    ctx.clip();
+    const blip = (wx, wz, color, r) => {
+      let dx = (wx - s.pos.x) * k;
+      let dz = (wz - s.pos.z) * k;
+      const d = Math.hypot(dx, dz);
+      if (d > rr - 5) { dx *= (rr - 5) / d; dz *= (rr - 5) / d; }
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(rcx + dx, rcy + dz, r, 0, Math.PI * 2);
+      ctx.fill();
+    };
+    // Runway: white tick at the strip centre (clamped to the rim).
+    blip(WORLD.runway.x, WORLD.runway.z, '#ffffff', 3);
+    if (s.nextDrop) blip(s.nextDrop.x, s.nextDrop.z, '#2eff5a', 4);
+    if (s.nextRing) blip(s.nextRing.x, s.nextRing.z, GOLD, 5);
+    // The jet: arrow on its heading (north-up: forward = (sin h, cos h)).
+    const fx = Math.sin(s.heading);
+    const fz = Math.cos(s.heading);
+    const px = -fz; // perpendicular, for the arrow base
+    const pz = fx;
+    ctx.fillStyle = CREAM;
+    ctx.beginPath();
+    ctx.moveTo(rcx + fx * 11, rcy + fz * 11);
+    ctx.lineTo(rcx - fx * 8 + px * 6, rcy - fz * 8 + pz * 6);
+    ctx.lineTo(rcx - fx * 8 - px * 6, rcy - fz * 8 - pz * 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = 'rgba(245, 233, 200, 0.75)';
+    ctx.font = '10px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('RADAR · 1.2 KM', rcx, rcy - rr - 6);
+  }
+
+  // ---- Bottom data bar (centre, between throttle and fuel) ----
+  // One line: speed, altitude, AGL, vertical speed, G-load, throttle + A/B.
+  // Sits above the throttle/fuel panels, clear of the dial column (x=108)
+  // and of the radar above the fuel panel.
+  {
+    const vs = s.verticalSpeedFpm;
+    const data = `SPD ${Math.round(s.speedKt)} KT  ·  ALT ${Math.round(s.altitudeFt)} FT  ·  AGL ${Math.round(s.aglFt)} FT  ·  V/S ${vs >= 0 ? '+' : ''}${Math.round(vs)} FPM  ·  G ${s.gLoad.toFixed(1)}  ·  THR ${Math.round(s.throttle * 100)}%${s.afterburner ? ' A/B' : ''}`;
+    ctx.font = 'bold 13px Georgia, serif';
+    const tw = ctx.measureText(data).width;
+    panel(ctx, w / 2 - tw / 2 - 16, h - 140, tw + 32, 32, 8);
+    ctx.fillStyle = s.afterburner ? '#ff9a3d' : CREAM;
+    ctx.textAlign = 'center';
+    ctx.fillText(data, w / 2, h - 118);
+  }
 
   // Airspeed dial — left column, top.
   dial(ctx, 108, 226, 38, 'AIRSPEED', 'KNOTS');
@@ -278,7 +378,7 @@ export function drawHud(ctx, s, w, h) {
     ctx.fillStyle = 'rgba(245, 233, 200, 0.85)';
     ctx.font = '14px Georgia, serif';
     ctx.textAlign = 'center';
-    ctx.fillText('W / S throttle · ← → roll · ↑ ↓ pitch · SPACE drop mail · drag mouse to look', w / 2, h - 148);
+    ctx.fillText('W / S throttle · ← → roll · ↑ ↓ pitch · SPACE drop mail · SHIFT afterburner · drag mouse to look', w / 2, h - 148);
   }
 
   // NOTE: no canvas end screen here. When a sortie ends the DOM results

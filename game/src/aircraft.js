@@ -1,16 +1,20 @@
-// Golden Mesa Courier — the detailed courier aeroplane.
-// One job: build the plane the camera chases. Nose faces +Z; heading rotates it.
-// No boxes for the airframe: lathe fuselage, extruded wings, spun propeller.
+// Golden Mesa Courier — the detailed courier JET.
+// One job: build the jet the camera chases. Nose faces +Z; heading rotates it.
+// No boxes for the airframe: lathe fuselage, extruded swept/delta wings,
+// twin afterburner nozzles with flame tongues. No propeller anywhere.
 //
-// buildAircraft(variant) takes the menu's choice: one of three models
-// (courier / racer / hauler) and a livery { base, stripe, accent }.
-// Called with no arguments it builds the original courier in the cream
-// livery, so the default game and every existing screenshot are unchanged.
+// buildAircraft(variant) takes the menu's choice: one of three jet models
+// (courier = INTERCEPTOR delta, racer = STRIKE swept, hauler = HAULER
+// wide-wing cargo jet) and a livery { base, stripe, accent }.
+// Called with no arguments it builds the interceptor in the cream livery.
 
 import * as THREE from 'three';
 
 const DEFAULT_LIVERY = { base: '#faf3dd', stripe: '#c22e2e', accent: '#e8722a' };
-const DEFAULT_MODEL = { radius: 1.0, length: 1.0, wingY: 0.62, pod: 1.0, twinFin: false, prop: 1.0 };
+const DEFAULT_MODEL = {
+  radius: 0.85, length: 1.1, wingY: 0.15, pod: 0, twinFin: false,
+  span: 5.2, sweep: 3.2, rootChord: 3.4, tipChord: 0.5, canard: true,
+};
 
 function fuselageTexture(base, stripe) {
   // Painted around the fuselage: body colour, a cheatline, gold pinstripes,
@@ -75,12 +79,15 @@ function finTexture(accent) {
   return tex;
 }
 
-function wingHalf(span, rootChord, tipChord, thickness, material) {
+function wingHalf(span, rootChord, tipChord, thickness, material, sweep = 0) {
   // Tapered, round-tipped half wing, extruded so it has a real airfoil edge.
+  // `sweep` slides the tip chord toward the tail (-Z after rotateX), so a
+  // delta wing reads as one big swept triangle and a swept wing as a
+  // classic fighter planform — never a straight prop-era wing.
   const shape = new THREE.Shape();
   shape.moveTo(0, -rootChord / 2);
-  shape.lineTo(span - 0.9, -tipChord / 2);
-  shape.quadraticCurveTo(span, 0, span - 0.9, tipChord / 2);
+  shape.lineTo(span - 0.9, -tipChord / 2 - sweep);
+  shape.quadraticCurveTo(span, -sweep, span - 0.9, tipChord / 2 - sweep);
   shape.lineTo(0, rootChord / 2);
   shape.quadraticCurveTo(-0.25, 0, 0, -rootChord / 2);
   const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.08, bevelSegments: 2 });
@@ -93,20 +100,13 @@ function wingHalf(span, rootChord, tipChord, thickness, material) {
   return mesh;
 }
 
-function bladeShape() {
-  const shape = new THREE.Shape();
-  shape.moveTo(0, -0.16);
-  shape.quadraticCurveTo(0.7, -0.22, 2.6, -0.1);
-  shape.quadraticCurveTo(2.85, 0, 2.6, 0.1);
-  shape.quadraticCurveTo(0.7, 0.22, 0, 0.16);
-  shape.quadraticCurveTo(-0.12, 0, 0, -0.16);
-  return shape;
-}
-
 /**
- * Build the plane; returns { group, propeller, navLights, gear }.
- * `variant` = { radius, length, wingY, pod, twinFin, prop, livery }.
- * With no argument: the original courier in the cream livery.
+ * Build the jet; returns { group, afterburner, navLights, gear }.
+ * `afterburner` is the flame-tongue group at the tail; main.js scales it
+ * (small idle flicker, long bright tongues on SHIFT) and hides nothing else.
+ * `variant` = { radius, length, wingY, pod, twinFin, span, sweep,
+ * rootChord, tipChord, canard, livery }.
+ * With no argument: the interceptor in the cream livery.
  */
 export function buildAircraft(variant = {}) {
   const v = { ...DEFAULT_MODEL, ...variant };
@@ -125,18 +125,19 @@ export function buildAircraft(variant = {}) {
   const steel = new THREE.MeshStandardMaterial({ color: '#8a8f96', roughness: 0.35, metalness: 0.8 });
   const tire = new THREE.MeshStandardMaterial({ color: '#1c1a18', roughness: 0.95 });
 
-  // Fuselage: lathe profile, tail tip -> nose tip, then laid along Z.
+  // Fuselage: slim lathe profile with a pointed nose — a jet, not a
+  // courier crate. Tail tip -> nose tip, then laid along Z.
   const profile = [
-    [0.02, -4.2], [0.42, -4.05], [0.62, -3.6], [0.78, -2.9], [0.92, -2.0],
-    [1.02, -1.0], [1.05, 0.0], [1.0, 0.9], [0.88, 1.9], [0.66, 2.9],
-    [0.42, 3.6], [0.18, 4.15], [0.02, 4.3],
+    [0.02, -4.2], [0.30, -4.05], [0.48, -3.6], [0.62, -2.9], [0.74, -2.0],
+    [0.82, -1.0], [0.85, 0.0], [0.80, 0.9], [0.68, 1.9], [0.52, 2.9],
+    [0.34, 3.6], [0.16, 4.2], [0.02, 4.55],
   ].map(([r, y]) => new THREE.Vector2(r * R, y * L));
   const fuselage = new THREE.Mesh(new THREE.LatheGeometry(profile, 28), cream);
   fuselage.rotation.x = Math.PI / 2; // axis -> Z, nose at +Z
   fuselage.castShadow = true;
   group.add(fuselage);
 
-  // Belly cargo pod: a smooth capsule slung under the cabin (racer has none).
+  // Belly cargo pod: a smooth capsule slung under the cabin (hauler only).
   if (v.pod > 0) {
     const pod = new THREE.Mesh(new THREE.CapsuleGeometry(0.55 * v.pod, 2.4, 6, 12), new THREE.MeshStandardMaterial({ color: '#b98a4e', roughness: 0.8 }));
     pod.rotation.x = Math.PI / 2;
@@ -147,57 +148,54 @@ export function buildAircraft(variant = {}) {
 
   // Canopy: a glass bubble sunk into the cabin top.
   const canopy = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), glass);
-  canopy.scale.set(0.82 * R, 0.62 * R, 1.5 * L);
-  canopy.position.set(0, 0.78 * R, 1.15 * L);
+  canopy.scale.set(0.7 * R, 0.55 * R, 1.4 * L);
+  canopy.position.set(0, 0.68 * R, 1.15 * L);
   group.add(canopy);
-  // Canopy frame: two thin hoops over the bubble. The half-torus already
-  // arches across the fuselage in the XY plane; rotating it about Y would
-  // turn the hoops fore-aft like a mohawk.
+  // Canopy frame: two thin hoops over the bubble.
   for (const z of [0.35, 1.55]) {
-    const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.78 * R, 0.05, 8, 24, Math.PI), dark);
-    hoop.position.set(0, 0.72 * R, z * L);
+    const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.66 * R, 0.05, 8, 24, Math.PI), dark);
+    hoop.position.set(0, 0.62 * R, z * L);
     hoop.rotation.z = 0;
     group.add(hoop);
   }
 
-  // Wing, two halves with dihedral, stripe tips, struts to the belly.
-  // wingHalf spans +X only, so the -X half is mirrored with rotation.y = PI;
-  // with the default XYZ Euler order Rz runs before Ry, so the same +0.07
-  // dihedral lifts BOTH tips (a mirrored side * -0.07 would droop one).
-  // A low wing (racer) sits near the belly and needs no struts.
-  const DIHEDRAL = 0.07;
-  const tipY = v.wingY + Math.sin(DIHEDRAL) * 6.35;
+  // Main wing: swept/delta, nearly flat (jets don't need prop dihedral).
+  // wingHalf spans +X only, so the -X half is mirrored with rotation.y = PI.
+  const DIHEDRAL = 0.05;
+  const wingZ = -0.2 * L;
+  const tipY = v.wingY + Math.sin(DIHEDRAL) * (v.span + 1.0);
   for (const side of [-1, 1]) {
-    const half = wingHalf(6.4, 2.1, 1.15, 0.16, creamPlain);
-    half.position.set(side * 0.1, v.wingY, 0.35 * L);
+    const half = wingHalf(v.span, v.rootChord, v.tipChord, 0.16, creamPlain, v.sweep);
+    half.position.set(side * 0.1, v.wingY, wingZ);
     if (side < 0) half.rotation.y = Math.PI; // mirror to -X
     half.rotation.z = DIHEDRAL;
     group.add(half);
     // Stripe tip: starts where the main wing ends and keeps the same dihedral,
     // so its root sits at the main wing's tip height.
-    const tip = wingHalf(1.0, 1.15, 0.9, 0.17, stripe);
-    tip.position.set(side * 6.35, tipY, 0.35 * L);
+    const tip = wingHalf(1.0, v.tipChord, v.tipChord * 0.8, 0.17, stripe, 0);
+    tip.position.set(side * v.span, tipY, wingZ - v.sweep);
     if (side < 0) tip.rotation.y = Math.PI;
     tip.rotation.z = DIHEDRAL;
     group.add(tip);
-    if (v.wingY > 0.3) {
-      // Strut from the wing underside (x = 2.6, y = 0.72) down to the belly
-      // (x = 0.7, y = -0.74): length ~2.6, leaning OUT as it rises.
-      const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.6, 8), steel);
-      strut.position.set(side * 1.65, -0.01, 0.55 * L);
-      strut.rotation.z = -side * 0.92;
-      group.add(strut);
+  }
+
+  // Canard foreplanes (interceptor only): small swept surfaces by the nose.
+  if (v.canard) {
+    for (const side of [-1, 1]) {
+      const canard = wingHalf(1.8, 0.9, 0.45, 0.1, creamPlain, 0.7);
+      canard.position.set(side * 0.1, 0.3 * R, 2.4 * L);
+      if (side < 0) canard.rotation.y = Math.PI;
+      canard.rotation.z = 0.05;
+      group.add(canard);
     }
   }
 
-  // Tail: stabiliser + fin(s), accent tips, registration plates on the fin.
-  // Same mirror + dihedral as the main wing: the -X half is mirrored so both
-  // stabilisers rise to the same height.
+  // Tail: swept stabilisers + fin(s), accent tips, registration plates.
   for (const side of [-1, 1]) {
-    const stab = wingHalf(2.6, 1.25, 0.7, 0.11, creamPlain);
+    const stab = wingHalf(2.6, 1.25, 0.7, 0.11, creamPlain, 1.2);
     stab.position.set(side * 0.08, 0.28 * R, -3.55 * L);
     if (side < 0) stab.rotation.y = Math.PI; // mirror to -X
-    stab.rotation.z = 0.07;
+    stab.rotation.z = 0.05;
     group.add(stab);
   }
   const finShape = new THREE.Shape();
@@ -250,52 +248,62 @@ export function buildAircraft(variant = {}) {
     }
   }
 
-  // Propeller: spinner cone, hub, two twisted blades with yellow tips.
-  const propeller = new THREE.Group();
-  const spinner = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.9, 16), accent);
-  spinner.rotation.x = Math.PI / 2;
-  spinner.position.z = 0.45;
-  propeller.add(spinner);
-  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.5, 12), dark);
-  hub.rotation.x = Math.PI / 2;
-  propeller.add(hub);
-  for (const angle of [0, Math.PI]) {
-    const blade = new THREE.Group();
-    const bladeMesh = new THREE.Mesh(new THREE.ExtrudeGeometry(bladeShape(), { depth: 0.07, bevelEnabled: false }), dark);
-    bladeMesh.rotation.x = -0.35; // pitch twist
-    blade.add(bladeMesh);
-    const tip = new THREE.Mesh(new THREE.ExtrudeGeometry(bladeShape(), { depth: 0.075, bevelEnabled: false }), new THREE.MeshStandardMaterial({ color: '#ffc23d', roughness: 0.5 }));
-    tip.scale.set(0.32, 1, 1);
-    tip.position.set(2.0, 0, -0.005);
-    tip.rotation.x = -0.35;
-    blade.add(tip);
-    blade.rotation.z = angle;
-    blade.scale.setScalar(v.prop);
-    propeller.add(blade);
-  }
-  propeller.position.set(0, 0, 4.35 * L);
-  // Blur disc: a faint translucent disc at the prop plane so the spinning
-  // propeller reads as a disc in stills, not a thin stick.
-  const blurDisc = new THREE.Mesh(
-    new THREE.CircleGeometry(2.9 * v.prop, 32),
-    new THREE.MeshBasicMaterial({
-      color: '#2b2622', transparent: true, opacity: 0.14,
-      side: THREE.DoubleSide, depthWrite: false,
-    }),
-  );
-  blurDisc.position.z = 0.5;
-  propeller.add(blurDisc);
-  group.add(propeller);
-
-  // Exhaust stubs under the nose, seated in the cowling: the fuselage radius
-  // at z = 3.55 is ~0.42, so the stubs sit at radial distance 0.38, their
-  // inner ends embedded in the cowling (the old position floated 0.36 clear).
+  // Twin afterburner: two steel nozzles at the tail + flame tongues.
+  // Each flame is a short, wide outer orange cone around a bright yellow
+  // core, tilted down-and-out so it clears the fuselage and reads from the
+  // chase camera (a flame pointing straight back at the camera is just a
+  // dot). A glowing disc caps each nozzle exit so the burner reads even
+  // when the tongues are foreshortened. main.js scales the group — short
+  // idle flicker, long bright tongues on afterburner.
+  const afterburner = new THREE.Group();
+  const flameOuterMat = new THREE.MeshBasicMaterial({
+    color: '#ff7a1a', transparent: true, opacity: 0.85, depthWrite: false,
+  });
+  const flameInnerMat = new THREE.MeshBasicMaterial({
+    color: '#ffd94a', transparent: true, opacity: 0.95, depthWrite: false,
+  });
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: '#ff9a3d', transparent: true, opacity: 0.95, depthWrite: false,
+  });
+  // main.js scales the meshes themselves (never the group): scaling the
+  // group would also shove the flames toward the chase camera, where they
+  // project below the viewport. Positions stay fixed; only length/width
+  // change between idle flicker and full afterburner.
+  const abCones = [];
+  const abGlows = [];
   for (const side of [-1, 1]) {
-    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.5, 8), dark);
-    pipe.rotation.x = Math.PI / 2;
-    pipe.position.set(side * 0.27 * R, -0.27 * R, 3.55 * L);
-    group.add(pipe);
+    const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.3, 0.7, 12), steel);
+    nozzle.rotation.x = Math.PI / 2;
+    nozzle.position.set(side * 0.5 * R, -0.12, -4.2 * L);
+    group.add(nozzle);
+    const flame = new THREE.Group();
+    flame.position.set(side * 0.5 * R, -0.12, -4.55 * L);
+    // Level, slightly splayed: the chase camera sits close behind and
+    // above, so anything tilted down or pushed a metre further back drops
+    // below the viewport — the burner must live at the nozzle exit itself.
+    flame.rotation.x = 0;
+    flame.rotation.y = -side * 0.08; // splay outward
+    const outer = new THREE.Mesh(new THREE.ConeGeometry(0.38, 1.6, 12), flameOuterMat);
+    outer.rotation.x = -Math.PI / 2; // cone tip -> -Z (backward)
+    outer.position.z = -0.7;
+    flame.add(outer);
+    abCones.push(outer);
+    const inner = new THREE.Mesh(new THREE.ConeGeometry(0.22, 1.1, 12), flameInnerMat);
+    inner.rotation.x = -Math.PI / 2;
+    inner.position.z = -0.5;
+    flame.add(inner);
+    abCones.push(inner);
+    // Glow disc AT the nozzle exit (wider than the nozzle, so an orange
+    // ring reads around the dark pipe even when the tongues foreshorten).
+    const glow = new THREE.Mesh(new THREE.CircleGeometry(0.5, 16), glowMat);
+    glow.rotation.y = Math.PI; // face backward, toward the chase camera
+    glow.position.z = -0.15;
+    flame.add(glow);
+    abGlows.push(glow);
+    afterburner.add(flame);
   }
+  afterburner.userData = { cones: abCones, glows: abGlows };
+  group.add(afterburner);
 
   // Landing gear: legs, torus tyres, hubs, tail wheel — kept in its own
   // group so the gear hides when it is retracted (gearDown = false).
@@ -329,18 +337,17 @@ export function buildAircraft(variant = {}) {
 
   // Navigation lights: red left (port), green right (starboard), white tail.
   // The nose faces +Z, so the plane's left side is +X in local space — the
-  // red light sits at +7.35 and the green at -7.35, not the other way round.
-  // The wingtip lights sit at the tip's outer end (tipY with dihedral);
-  // the tail light sits on the tail tip itself.
+  // red light sits at the +X tip and the green at the -X tip.
+  const tipX = v.span + 0.95;
   const navLights = {};
   const lightGeo = new THREE.SphereGeometry(0.09, 8, 6);
   navLights.left = new THREE.Mesh(lightGeo, new THREE.MeshStandardMaterial({ color: '#ff2e2e', emissive: '#ff2e2e', emissiveIntensity: 2.5 }));
-  navLights.left.position.set(7.35, tipY + 0.05, 0.35 * L);
+  navLights.left.position.set(tipX, tipY + 0.05, wingZ - v.sweep);
   navLights.right = new THREE.Mesh(lightGeo, new THREE.MeshStandardMaterial({ color: '#2eff5a', emissive: '#2eff5a', emissiveIntensity: 2.5 }));
-  navLights.right.position.set(-7.35, tipY + 0.05, 0.35 * L);
+  navLights.right.position.set(-tipX, tipY + 0.05, wingZ - v.sweep);
   navLights.tail = new THREE.Mesh(lightGeo, new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 2 }));
   navLights.tail.position.set(0, 0.12, -4.22 * L);
   group.add(navLights.left, navLights.right, navLights.tail);
 
-  return { group, propeller, navLights, gear };
+  return { group, afterburner, navLights, gear };
 }

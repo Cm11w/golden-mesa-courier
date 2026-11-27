@@ -86,6 +86,9 @@ export function stageShot(shotId) {
 
   // Per-shot callout, as the real game would show it.
   if (shotId === 'leg1') {
+    // The gameplay showcase shot: afterburner lit for the whole staging
+    // flight (autopilot never sends the field, so stepWorld keeps it on).
+    s.afterburner = true;
     s.callout = 'GATE 02 — THREAD THE GOLDEN RING!';
     s.calloutUntil = s.elapsed + 30;
   } else if (shotId === 'leg2') {

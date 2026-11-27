@@ -66,15 +66,18 @@ export function buildDrops() {
     });
 
   // One reusable parcel mesh per drop (hidden until its parcel falls).
-  const parcelGeo = new THREE.BoxGeometry(2.2, 1.6, 2.2);
-  const parcelMat = new THREE.MeshStandardMaterial({ color: '#c98a4b', roughness: 0.8 });
+  // Deliberately chunky and cream-coloured: at 350 m a 2.2 m brown box was
+  // a 5 px smudge on brown sand; the landed parcel is the payoff of the
+  // airmail shot, so it has to read. Size and colour only — no rule changes.
+  const parcelGeo = new THREE.BoxGeometry(3.4, 2.4, 3.4);
+  const parcelMat = new THREE.MeshStandardMaterial({ color: '#f5e9c8', roughness: 0.8 });
   const strapMat = new THREE.MeshStandardMaterial({ color: '#8a2f2f', roughness: 0.7 });
   const parcels = [];
   for (let i = 0; i < 4; i += 1) {
     const p = new THREE.Group();
     const box = new THREE.Mesh(parcelGeo, parcelMat);
     box.castShadow = true;
-    const strap = new THREE.Mesh(new THREE.BoxGeometry(2.3, 1.65, 0.5), strapMat);
+    const strap = new THREE.Mesh(new THREE.BoxGeometry(3.5, 2.45, 0.7), strapMat);
     p.add(box, strap);
     p.visible = false;
     group.add(p);

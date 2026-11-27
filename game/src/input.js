@@ -47,6 +47,8 @@ export function createInput(canvas) {
       const roll = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0);
       const restart = keys.has('KeyR');
       const gear = keys.has('KeyG');
+      // Afterburner: hold either Shift (or B) — live, not edge-triggered.
+      const afterburner = keys.has('ShiftLeft') || keys.has('ShiftRight') || keys.has('KeyB');
       // Edge-triggered actions: consumed once per press, never held.
       const drop = keys.has('Space');
       const start = keys.has('Enter') || clicked;
@@ -55,7 +57,7 @@ export function createInput(canvas) {
       if (drop) keys.delete('Space');
       if (keys.has('Enter')) keys.delete('Enter');
       clicked = false;
-      return { pitch, roll, throttle: next, restart, gear, drop, start };
+      return { pitch, roll, throttle: next, restart, gear, drop, start, afterburner };
     },
     /** Mouse look offset in radians; decays back to centre when released. */
     look() {

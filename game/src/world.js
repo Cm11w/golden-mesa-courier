@@ -7,6 +7,8 @@ import { CALLSIGN, DROP_RADIUS, DROP_SPOTS, FUEL_RING_BONUS, LEGS, LOW_FUEL_AT, 
 import { groundHeightAt } from './terrain.js';
 
 export const MAX_SPEED = 88; // m/s, about 171 kt
+export const AB_BOOST = 1.35; // afterburner: +35% top speed
+export const AB_FUEL_MULT = 3; // afterburner burns 3x the fuel
 const TURN_RATE = 0.55;
 const PITCH_RATE = 0.55;
 const ROLL_RATE = 1.6;
@@ -29,6 +31,8 @@ export function createWorld() {
     callsign: CALLSIGN,
     fuel: 100,
     airframe: 100,
+    hull: 100, // structural damage: ground strike -25, hard landing -15..-30
+    afterburner: false,
     elapsed: 0,
     timeLimit: WORLD.timeLimit,
     pos: new THREE.Vector3(WORLD.start.x, WORLD.start.y, WORLD.start.z),
@@ -71,7 +75,12 @@ export function stepWorld(s, input, dt) {
 
   // --- Controls ---
   s.throttle = THREE.MathUtils.clamp(input.throttle ?? s.throttle, 0, 1);
-  const targetSpeed = 18 + s.throttle * (MAX_SPEED - 18);
+  // Afterburner (SHIFT held): +35% top speed at 3x fuel burn. The autopilot
+  // never sends the field, so a staged shot can keep it on (undefined =
+  // keep the staged value) while interactive play always drives it.
+  if (input.afterburner !== undefined) s.afterburner = !!input.afterburner;
+  const maxSpeed = s.afterburner ? MAX_SPEED * AB_BOOST : MAX_SPEED;
+  const targetSpeed = 18 + s.throttle * (maxSpeed - 18);
   s.speed += (targetSpeed - s.speed) * Math.min(1, dt * 0.8);
   s.pitch = THREE.MathUtils.clamp(s.pitch + (input.pitch ?? 0) * PITCH_RATE * dt, -MAX_PITCH, MAX_PITCH);
   s.roll = THREE.MathUtils.clamp(s.roll + (input.roll ?? 0) * ROLL_RATE * dt, -MAX_ROLL, MAX_ROLL);
@@ -100,8 +109,8 @@ export function stepWorld(s, input, dt) {
   // Drain is % per second: 0.12 idle plus 0.40 at full throttle, so a sortie
   // flown at cruise throttle (0.7) burns 0.40 %/s — 100% plus the gate
   // top-ups just covers the 336 s mission clock, and fuel, not time, is the
-  // binding limit on a slow run.
-  s.fuel -= dt * (0.12 + s.throttle * 0.40);
+  // binding limit on a slow run. Afterburner triples the whole drain.
+  s.fuel -= dt * (0.12 + s.throttle * 0.40) * (s.afterburner ? AB_FUEL_MULT : 1);
   if (s.fuel <= LOW_FUEL_AT && !s.warnedFuel) {
     s.warnedFuel = true;
     setCallout(s, 'LOW FUEL — FLY HER HOME', 4, true);
@@ -126,13 +135,23 @@ export function stepWorld(s, input, dt) {
   // --- Terrain ---
   const ground = groundHeightAt(s.pos.x, s.pos.z);
   if (s.pos.y <= ground + 2.5) {
-    s.pos.y = ground + 2.5;
-    s.phase = 'over';
-    s.overReason = 'TERRAIN STRIKE — THE CANYON WINS THIS TIME';
-    s.airframe = 12;
-    events.push('over');
+    // Ground strike costs 25 hull and bounces the jet back up to climb
+    // away — only a strike at 0 hull is fatal. The autopilot never strikes,
+    // so the 12/12 + landing test is unaffected.
+    s.hull = Math.max(0, s.hull - 25);
+    s.pos.y = ground + 12;
+    s.pitch = 0.15;
+    s.speed *= 0.7;
     events.push('thud');
-    return events;
+    if (s.hull <= 0) {
+      s.phase = 'over';
+      s.overReason = 'HULL BREACH — AIRCRAFT LOST';
+      s.airframe = 0;
+      events.push('over');
+      return events;
+    }
+    setCallout(s, `GROUND STRIKE — HULL ${s.hull}%`, 4, true);
+    events.push('warn');
   }
   if (s.pos.y > 420) s.pos.y = 420;
 
@@ -195,6 +214,21 @@ export function stepWorld(s, input, dt) {
       const vsFpm = Math.abs(s.verticalSpeed) * 196.85;
       s.landingGrade = centreOffset < 8 && vsFpm < 180 ? 'PERFECT'
         : centreOffset < 16 && vsFpm < 320 ? 'GOOD' : 'HARD';
+      // A hard touchdown bends the airframe: -15 / -22 / -30 by how hard it
+      // was. A landing that breaks the last of the hull is a crash, not a
+      // touchdown — the results screen says so.
+      if (s.landingGrade === 'HARD') {
+        const dmg = vsFpm < 600 ? 15 : vsFpm < 1200 ? 22 : 30;
+        s.hull = Math.max(0, s.hull - dmg);
+        if (s.hull <= 0) {
+          s.phase = 'over';
+          s.overReason = 'HULL BREACH — AIRCRAFT LOST';
+          s.airframe = 0;
+          events.push('over');
+          return events;
+        }
+        setCallout(s, `HARD LANDING — HULL ${s.hull}%`, 4, true);
+      }
       s.score += s.landingGrade === 'PERFECT' ? 500 : s.landingGrade === 'GOOD' ? 250 : 100;
       s.score += Math.round((s.timeLimit - s.elapsed) / 10) * 10;
       events.push('landed');
@@ -240,11 +274,22 @@ export function dropPackage(s) {
 /** HUD-friendly numbers derived from the state. */
 export function hudState(s) {
   const ground = groundHeightAt(s.pos.x, s.pos.z);
+  const nextRing = s.ringsCleared < RING_COUNT ? RING_SPOTS[s.ringsCleared] : null;
+  const nextDrop = s.drops.find((d) => !d.done && d.leg === s.leg) || null;
   return {
     ...s,
     altitudeFt: Math.max(0, (s.pos.y - ground) * 3.28084),
     speedKt: s.speed * 1.94384,
     headingDeg: ((s.heading * 180) / Math.PI + 360) % 360,
     verticalSpeedFpm: s.verticalSpeed * 196.85,
+    // Height above the ground right below the jet, in feet.
+    aglFt: Math.max(0, (s.pos.y - ground) * 3.28084),
+    // G-load, simplified: 1 + bank + pitch effort, clamped 1..4 G.
+    gLoad: Math.min(4, Math.max(1, 1 + Math.abs(s.roll) * 0.8 + Math.abs(s.pitch) * 0.5)),
+    nextRing: nextRing ? { x: nextRing[0], y: nextRing[1], z: nextRing[2] } : null,
+    nextRingNm: nextRing
+      ? Math.hypot(nextRing[0] - s.pos.x, nextRing[1] - s.pos.y, nextRing[2] - s.pos.z) / 1852
+      : 0,
+    nextDrop: nextDrop ? { x: nextDrop.x, z: nextDrop.z, label: nextDrop.label } : null,
   };
 }

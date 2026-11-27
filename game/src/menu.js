@@ -68,16 +68,19 @@ const CSS = `
 #gmc-tomenu:hover { border-color: #ffc23d; }
 `;
 
-// Side-view silhouettes for the aircraft cards (schematic, one per model).
+// Side-view silhouettes for the aircraft cards (schematic jet, one per model).
 function silhouette(modelId) {
   const common = '<circle cx="168" cy="34" r="13" fill="none" stroke="#ffc23d" stroke-width="2.5"/>';
   if (modelId === 'racer') {
-    return `<svg viewBox="0 0 180 70"><ellipse cx="90" cy="38" rx="62" ry="11" fill="#f5e9c8"/><path d="M118 30 L138 16 L142 30 Z" fill="#e8722a"/><rect x="52" y="46" width="86" height="5" rx="2" fill="#c22e2e"/>${common}<path d="M150 38 L168 34" stroke="#f5e9c8" stroke-width="2"/></svg>`;
+    // STRIKE: swept wing, single fin, pointed nose, twin flame.
+    return `<svg viewBox="0 0 180 70"><path d="M20 40 L150 34 L168 38 L150 44 L20 46 Z" fill="#f5e9c8"/><path d="M70 38 L118 12 L124 38 Z" fill="#c22e2e"/><path d="M96 34 L112 8 L118 34 Z" fill="#e8722a"/><path d="M14 38 L2 34 L2 42 L14 42 Z" fill="#ff7a1a"/>${common}</svg>`;
   }
   if (modelId === 'hauler') {
-    return `<svg viewBox="0 0 180 70"><ellipse cx="90" cy="38" rx="62" ry="16" fill="#f5e9c8"/><rect x="48" y="12" width="84" height="5" rx="2" fill="#c22e2e"/><path d="M34 28 L52 10 L56 28 Z" fill="#e8722a"/><path d="M126 28 L144 10 L148 28 Z" fill="#e8722a"/><ellipse cx="90" cy="56" rx="26" ry="7" fill="#b98a4e"/>${common}</svg>`;
+    // HAULER: fat body, wide wing, twin fins, cargo pod, twin flame.
+    return `<svg viewBox="0 0 180 70"><ellipse cx="90" cy="38" rx="62" ry="16" fill="#f5e9c8"/><rect x="48" y="12" width="84" height="5" rx="2" fill="#c22e2e"/><path d="M34 28 L52 10 L56 28 Z" fill="#e8722a"/><path d="M126 28 L144 10 L148 28 Z" fill="#e8722a"/><ellipse cx="90" cy="56" rx="26" ry="7" fill="#b98a4e"/><path d="M14 38 L2 34 L2 42 L14 42 Z" fill="#ff7a1a"/>${common}</svg>`;
   }
-  return `<svg viewBox="0 0 180 70"><ellipse cx="90" cy="38" rx="62" ry="12" fill="#f5e9c8"/><rect x="48" y="16" width="84" height="5" rx="2" fill="#c22e2e"/><path d="M34 30 L52 12 L56 30 Z" fill="#e8722a"/><ellipse cx="90" cy="52" rx="24" ry="7" fill="#b98a4e"/>${common}</svg>`;
+  // INTERCEPTOR: big delta wing, canards, pointed nose, twin flame.
+  return `<svg viewBox="0 0 180 70"><path d="M22 40 L150 34 L168 38 L150 44 L22 46 Z" fill="#f5e9c8"/><path d="M58 38 L132 14 L138 38 Z" fill="#c22e2e"/><path d="M128 32 L146 20 L148 32 Z" fill="#e8722a"/><path d="M14 38 L2 34 L2 42 L14 42 Z" fill="#ff7a1a"/>${common}</svg>`;
 }
 
 /** Build the menu + results overlays. Returns the controller main.js uses. */
@@ -91,7 +94,7 @@ export function createMenu(hooks) {
   menuEl.innerHTML = `
     <div class="gmc-col gmc-left">
       <div class="gmc-title">GOLDEN MESA<br>COURIER</div>
-      <p class="gmc-sub">A golden-hour mail run through the canyon — thread the rings, land her gently. Callsign N427GM.</p>
+      <p class="gmc-sub">A golden-hour mail run through the canyon — thread the rings in your jet, land her gently. Callsign N427GM.</p>
       <div class="gmc-box">
         <h3>THE MISSION</h3>
         <p>Fly <b>3 legs</b> — Canyon Run, River Bend, Mesa Gates — and thread <b>12 golden rings</b> in order. Every ring tops up your fuel. Then land on the desert strip: centreline + gentle touchdown earns <b>PERFECT</b>.</p>
@@ -104,6 +107,7 @@ export function createMenu(hooks) {
           <b>← →</b><span>Roll / turn</span>
           <b>↑ ↓</b><span>Pitch up / down</span>
           <b>SPACE</b><span>Drop the mail on a golden circle</span>
+          <b>SHIFT</b><span>Afterburner — +35% speed, 3× fuel burn</span>
           <b>G</b><span>Landing gear</span>
           <b>R</b><span>Restart sortie</span>
           <b>Drag</b><span>Look around</span>
@@ -193,7 +197,10 @@ export function createMenu(hooks) {
     if (!previewPlane) rebuildPreview();
     previewAngle += 0.02;
     previewPlane.group.rotation.y = previewAngle;
-    previewPlane.propeller.rotation.z += 0.3;
+    // Idle afterburner flicker in the preview: short tongues, gentle pulse.
+    const f = 0.55 + 0.12 * Math.sin(previewAngle * 6);
+    for (const c of previewPlane.afterburner.userData.cones) c.scale.set(f, 0.7, f);
+    for (const g of previewPlane.afterburner.userData.glows) g.scale.set(f, f, 1);
     previewRenderer.render(previewScene, previewCam);
   }
 
@@ -302,12 +309,13 @@ export function createMenu(hooks) {
         title.textContent = 'A GOLDEN TOUCHDOWN';
         grade.textContent = `LANDING GRADE · ${s.landingGrade}`;
         grade.classList.remove('bad');
-        rows.innerHTML = `GATES <b>${s.ringsCleared} / 12</b><br>CARGO DELIVERED <b>${s.cargoKg} KG</b><br>AIRMAIL <b>${s.dropsDone ?? 0} / 4 · +${s.dropBonusTotal ?? 0}</b><br>SCORE <b>${String(s.score).padStart(6, '0')}</b>`;
+        rows.innerHTML = `GATES <b>${s.ringsCleared} / 12</b><br>CARGO DELIVERED <b>${s.cargoKg} KG</b><br>AIRMAIL <b>${s.dropsDone ?? 0} / 4 · +${s.dropBonusTotal ?? 0}</b><br>HULL <b>${s.hull ?? 100}%</b><br>SCORE <b>${String(s.score).padStart(6, '0')}</b>`;
       } else {
-        title.textContent = 'SORTIE OVER';
+        const crashed = (s.overReason || '').includes('HULL BREACH');
+        title.textContent = crashed ? 'HULL BREACH' : 'SORTIE OVER';
         grade.textContent = s.overReason || 'SORTIE OVER';
         grade.classList.add('bad');
-        rows.innerHTML = `GATES <b>${s.ringsCleared} / 12</b><br>AIRMAIL <b>${s.dropsDone ?? 0} / 4 · +${s.dropBonusTotal ?? 0}</b><br>SCORE <b>${String(s.score).padStart(6, '0')}</b>`;
+        rows.innerHTML = `GATES <b>${s.ringsCleared} / 12</b><br>AIRMAIL <b>${s.dropsDone ?? 0} / 4 · +${s.dropBonusTotal ?? 0}</b><br>HULL <b>${s.hull ?? 100}%</b><br>SCORE <b>${String(s.score).padStart(6, '0')}</b>`;
       }
       resultsEl.classList.add('show');
     },
